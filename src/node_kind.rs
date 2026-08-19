@@ -75,6 +75,7 @@ pub enum GDScriptNodeKind {
     // Attribute access and method calls
     Attribute,
     AttributeCall,
+    AttributeSubscript,
 
     // Leaf nodes with special handling
     String,
@@ -88,6 +89,7 @@ pub enum GDScriptNodeKind {
     Literal,
     /// typed_parameter, default_parameter, typed_default_parameter
     Parameter,
+    VariadicParameter,
 
     // Punctuation. Tree-sitter treats these as named nodes in its concrete
     // syntax tree.
@@ -280,6 +282,7 @@ const MAP_TREE_SITTER_TO_GDSCRIPT_NODE_KIND: &[(&str, GDScriptNodeKind)] = &[
     ("pass_statement", GDScriptNodeKind::PassStatement),
     ("attribute", GDScriptNodeKind::Attribute),
     ("attribute_call", GDScriptNodeKind::AttributeCall),
+    ("attribute_subscript", GDScriptNodeKind::AttributeSubscript),
     ("string", GDScriptNodeKind::String),
     ("string_name", GDScriptNodeKind::StringName),
     ("node_path", GDScriptNodeKind::NodePath),
@@ -295,6 +298,7 @@ const MAP_TREE_SITTER_TO_GDSCRIPT_NODE_KIND: &[(&str, GDScriptNodeKind)] = &[
     ("typed_parameter", GDScriptNodeKind::Parameter),
     ("default_parameter", GDScriptNodeKind::Parameter),
     ("typed_default_parameter", GDScriptNodeKind::Parameter),
+    ("variadic_parameter", GDScriptNodeKind::VariadicParameter),
     ("(", GDScriptNodeKind::TokenParen),
     (")", GDScriptNodeKind::TokenParen),
     ("()", GDScriptNodeKind::TokenParen),

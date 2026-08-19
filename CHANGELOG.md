@@ -7,6 +7,7 @@ This file documents the changes made to the formatter with each release.
 ### Added
 
 - Added `--verbose` option to print one line per formatted file (#227)
+- Added an `index` sub-command that writes a machine-readable index of GDScript declarations, references, member chains, string literals, comparisons and comments to stdout as JSON Lines, for tools that need source positions the engine cannot give them. See `docs/specification_index.md`
 
 ### Changed
 

@@ -239,6 +239,32 @@ obj._private_method() # gdlint-ignore
 - `max-line-length` - validates maximum line length
 - `no-else-return` - detects unnecessary else after `if`/`elif` blocks that end with `return`
 
+## Indexing GDScript files for other tools
+
+The `index` sub-command writes a machine-readable index of your GDScript to stdout: declarations, references, member chains, string literals, comparisons and comments, each with the exact source range it came from.
+
+It exists for tools that know what your code *means* but not *where it is*. A static analyser running inside Godot can ask the engine for every member of a class, every signal's arity and every engine virtual, and knows none of it by line number. Tree-sitter knows exactly where each declaration, call and annotation sits, and nothing about what any of them are. Checks such as "this member does not exist on that type" need both halves, and reconstructing the syntactic half with regular expressions over lines is where such tools break.
+
+```bash
+gdscript-formatter index
+gdscript-formatter index scenes/ -x scenes/generated
+gdscript-formatter index scripts/player.gd
+```
+
+The output is [JSON Lines](https://jsonlines.org): one JSON object per line, no enclosing array, so a consumer can parse it incrementally and every line stays small enough for `JSON.parse_string` in GDScript. Each file contributes a header record followed by its content records:
+
+```jsonl
+{"record":"file","schema":1,"path":"res://hud/hud.gd"}
+{"record":"declaration","kind":"class","name":"Hud","scope":"", ...}
+{"record":"member_chain","segments":[{"name":"self", ...},{"name":"clock", ...}], ...}
+```
+
+Paths are reported as `res://` paths when the file sits inside a Godot project, so they match what the engine reports. One invocation handles a whole project: do not spawn a process per file.
+
+The sub-command exits with code 2 when a file fails to parse, and names that file on stderr. The file still gets a header record carrying `"parse_error": true`, so a consumer can tell "no records because the file is broken" apart from "no records because nothing matched". Diagnostics always go to stderr, so stdout stays parseable.
+
+The record shapes, the `scope` and `context` values and the reasoning behind each of them are documented in [docs/specification_index.md](docs/specification_index.md).
+
 ## Using the formatter in code editors
 
 > [!NOTE]
@@ -390,7 +416,7 @@ To add new formatting rules to the GDScript formatter, you can follow these step
 
 Here are the most important directories and files in the project:
 
-- `src/`: Contains the code of the formatter and the linter. Quick run through the files: `formatter.rs` (formatting rules), `renderer.rs` (line wrapping and output), `reorder.rs` (code reordering), `safe_mode.rs` (the safe mode check), `editorconfig.rs` (EditorConfig support), and the `linter/` directory (linter rules).
+- `src/`: Contains the code of the formatter, the linter and the indexer. Quick run through the files: `formatter.rs` (formatting rules), `renderer.rs` (line wrapping and output), `reorder.rs` (code reordering), `safe_mode.rs` (the safe mode check), `editorconfig.rs` (EditorConfig support), the `linter/` directory (linter rules), and the `index/` directory (index collectors).
 - `tests/`: Contains test files for the formatter. It has input files with unformatted GDScript code and expected output files that the formatter should produce when run on the input files, plus dedicated tests for the linter and the reorder feature.
 - `benchmarks/`: Contains GDScript files used to measure the formatter's performance.
 - `addons/`: Contains the source of the Godot editor add-on.

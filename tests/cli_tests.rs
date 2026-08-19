@@ -117,3 +117,63 @@ fn stdin_and_file_modes_apply_editorconfig_and_cli_overrides() {
 
     fs::remove_dir_all(directory).expect("should remove temporary test directory");
 }
+
+#[test]
+fn index_reports_project_relative_paths_and_fails_on_parse_errors() {
+    let directory = test_directory();
+    fs::write(directory.join("project.godot"), "config_version=5\n")
+        .expect("should write a Godot project file");
+    fs::create_dir(directory.join("hud")).expect("should create a subdirectory");
+    fs::write(
+        directory.join("hud/hud.gd"),
+        "class_name Hud\nextends CanvasLayer\n",
+    )
+    .expect("should write an indexable file");
+    fs::write(directory.join("skipped.gd"), "var skipped := 1\n")
+        .expect("should write a file to exclude");
+
+    let output = formatter_command(&directory, &["index", "-x", "skipped.gd", "."])
+        .output()
+        .expect("should index the project");
+    assert!(output.status.success());
+    let lines = String::from_utf8(output.stdout).expect("index output should be valid UTF-8");
+    assert!(
+        lines.contains("\"path\":\"res://hud/hud.gd\""),
+        "expected a res:// path, got: {}",
+        lines
+    );
+    assert!(!lines.contains("skipped"), "the excluded file was indexed");
+    assert!(lines.contains("\"record\":\"declaration\",\"kind\":\"class\",\"name\":\"Hud\""));
+
+    // Stdin is indexed under a synthetic path so editors can pipe a buffer in.
+    let mut stdin_command = formatter_command(&directory, &["index"]);
+    stdin_command.stdin(Stdio::piped()).stdout(Stdio::piped());
+    let mut child = stdin_command.spawn().expect("should start the indexer");
+    child
+        .stdin
+        .take()
+        .expect("stdin should be piped")
+        .write_all(b"var health := 5\n")
+        .expect("should write indexer input");
+    let stdin_output = child
+        .wait_with_output()
+        .expect("should collect indexer output");
+    assert!(stdin_output.status.success());
+    let stdin_lines =
+        String::from_utf8(stdin_output.stdout).expect("index output should be valid UTF-8");
+    assert!(stdin_lines.starts_with("{\"record\":\"file\",\"schema\":1,\"path\":\"<stdin>\"}\n"));
+
+    // A file that does not parse still gets a header, and the run fails so a
+    // consumer cannot mistake a broken project for a clean one.
+    fs::write(directory.join("broken.gd"), "func (:\n").expect("should write a broken file");
+    let broken_output = formatter_command(&directory, &["index", "broken.gd"])
+        .output()
+        .expect("should run the indexer on a broken file");
+    assert!(!broken_output.status.success());
+    let broken_lines =
+        String::from_utf8(broken_output.stdout).expect("index output should be valid UTF-8");
+    assert!(broken_lines.contains("\"parse_error\":true"));
+    assert_eq!(broken_lines.lines().count(), 1);
+
+    fs::remove_dir_all(directory).expect("should remove temporary test directory");
+}

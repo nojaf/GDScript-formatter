@@ -16,6 +16,7 @@
 
 pub mod editorconfig;
 pub mod formatter;
+pub mod index;
 pub mod linter;
 pub mod node_kind;
 pub mod parser;

@@ -13,6 +13,7 @@ const HELP_FORMATTER: &str = "\
 
 	Usage: gdscript-formatter [OPTIONS] [FILES]...
 	       gdscript-formatter lint [OPTIONS] [FILES]...
+	       gdscript-formatter index [OPTIONS] [FILES]...
 
 	Arguments:
 	  <FILES>...  GDScript files or directories to format. If empty, uses
@@ -36,8 +37,10 @@ const HELP_FORMATTER: &str = "\
 
 	Subcommands:
 	  lint                     Lint GDScript files for style issues
+	  index                    Write a machine-readable index of GDScript files
 
-	Run 'gdscript-formatter lint --help' for lint options.
+	Run 'gdscript-formatter lint --help' or 'gdscript-formatter index --help' for
+	their options.
 ";
 
 const HELP_LINTER: &str = "\
@@ -54,6 +57,25 @@ Options:
       --max-line-length <NUM>  Maximum line length allowed (default: 100)
       --list-rules            List all available linting rules
       --pretty                Use pretty formatting for lint output
+  -h, --help                  Print help
+";
+
+const HELP_INDEX: &str = "\
+Write a machine-readable index of GDScript declarations, references, member
+chains, string literals, comparisons and comments to stdout.
+
+The output is JSON Lines: one JSON object per line, no enclosing array. One
+invocation handles a whole project; do not spawn a process per file.
+
+Usage: gdscript-formatter index [OPTIONS] [FILES]...
+
+Arguments:
+  <FILES>...                 GDScript files or directories to index. If empty,
+                             uses the current directory. Reads from stdin when
+                             piped.
+
+Options:
+  -x, --exclude <PATH>         Exclude a file or directory (may be repeated)
   -h, --help                  Print help
 ";
 
@@ -117,6 +139,8 @@ pub enum Command {
         /// rules in a human-readable format.
         do_pretty_print: bool,
     },
+    /// Write a machine-readable index of GDScript files to stdout.
+    Index,
 }
 
 /// Internal discriminator used during parsing to track which command's flags
@@ -124,6 +148,7 @@ pub enum Command {
 enum ActiveCommand {
     Format,
     Lint,
+    Index,
 }
 
 pub fn parse_args() -> CliArguments {
@@ -155,6 +180,9 @@ pub fn parse_args() -> CliArguments {
     if argument_list.len() > 1 && argument_list[1] == "lint" {
         active_command = ActiveCommand::Lint;
         current_argument_index = 2;
+    } else if argument_list.len() > 1 && argument_list[1] == "index" {
+        active_command = ActiveCommand::Index;
+        current_argument_index = 2;
     }
 
     while current_argument_index < argument_list.len() {
@@ -175,6 +203,7 @@ pub fn parse_args() -> CliArguments {
             match active_command {
                 ActiveCommand::Format => print!("{}", HELP_FORMATTER),
                 ActiveCommand::Lint => print!("{}", HELP_LINTER),
+                ActiveCommand::Index => print!("{}", HELP_INDEX),
             }
             std::process::exit(0);
         }
@@ -356,6 +385,21 @@ pub fn parse_args() -> CliArguments {
                         flag_name
                     )),
                 },
+                ActiveCommand::Index => match flag_name {
+                    "exclude" => {
+                        let value = consume_flag_value(
+                            assigned_value,
+                            &argument_list,
+                            &mut current_argument_index,
+                            "--exclude",
+                        );
+                        excluded_paths.push(PathBuf::from(value));
+                    }
+                    _ => print_error_invalid_argument(&format!(
+                        "unexpected argument '--{}'",
+                        flag_name
+                    )),
+                },
             }
         } else if current_argument.starts_with('-') && current_argument.len() > 1 {
             let short_flags = &current_argument[1..];
@@ -373,19 +417,19 @@ pub fn parse_args() -> CliArguments {
             for flag_char in short_flags.chars() {
                 match flag_char {
                     'c' => {
-                        if matches!(active_command, ActiveCommand::Lint) {
+                        if !matches!(active_command, ActiveCommand::Format) {
                             print_error_invalid_argument("unexpected argument '-c'");
                         }
                         format_do_check_formatted_only = true;
                     }
                     's' => {
-                        if matches!(active_command, ActiveCommand::Lint) {
+                        if !matches!(active_command, ActiveCommand::Format) {
                             print_error_invalid_argument("unexpected argument '-s'");
                         }
                         format_use_verify_structure = true;
                     }
                     'v' => {
-                        if matches!(active_command, ActiveCommand::Lint) {
+                        if !matches!(active_command, ActiveCommand::Format) {
                             print_error_invalid_argument("unexpected argument '-v'");
                         }
                         format_use_verbose_output = true;
@@ -429,6 +473,11 @@ pub fn parse_args() -> CliArguments {
                 do_list_rules: lint_list_rules,
                 do_pretty_print: lint_pretty_print,
             },
+        },
+        ActiveCommand::Index => CliArguments {
+            input_file_paths,
+            excluded_paths,
+            command: Command::Index,
         },
     }
 }

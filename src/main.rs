@@ -115,6 +115,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
 
+    if matches!(parsed_cli_args.command, Command::Index) {
+        return run_index(
+            &parsed_cli_args.input_file_paths,
+            &parsed_cli_args.excluded_paths,
+        );
+    }
+
     let Command::Format {
         do_print_to_stdout,
         use_verbose_output,
@@ -350,6 +357,49 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 );
             }
         }
+    }
+
+    Ok(())
+}
+
+/// Writes the index of every input file to stdout as JSON Lines.
+///
+/// Reads from stdin when no path is given and stdin is piped, so the sub-command
+/// works the same way as the formatter for editor integrations.
+fn run_index(
+    input_file_paths: &[PathBuf],
+    excluded_paths: &[PathBuf],
+) -> Result<(), Box<dyn std::error::Error>> {
+    if input_file_paths.is_empty() && !io::stdin().is_terminal() {
+        let mut input_content = String::new();
+        io::stdin()
+            .read_to_string(&mut input_content)
+            .map_err(|error| format!("Failed to read from stdin: {}", error))?;
+
+        let mut output = String::new();
+        let parsed_without_errors =
+            gdscript_formatter::index::index_source(&input_content, "<stdin>", &mut output);
+        print!("{}", output);
+        if !parsed_without_errors {
+            eprintln!("Failed to index stdin: the GDScript code contains parse errors");
+            std::process::exit(FormatterExitCodes::ParseErrors as i32);
+        }
+        return Ok(());
+    }
+
+    let input_paths = if input_file_paths.is_empty() {
+        vec![
+            env::current_dir()
+                .map_err(|error| format!("Failed to get current directory: {}", error))?,
+        ]
+    } else {
+        input_file_paths.to_vec()
+    };
+    let input_gdscript_files = find_gdscript_files(&input_paths, excluded_paths)?;
+
+    let had_parse_errors = gdscript_formatter::index::index_gdscript_files(&input_gdscript_files)?;
+    if had_parse_errors {
+        std::process::exit(FormatterExitCodes::ParseErrors as i32);
     }
 
     Ok(())
