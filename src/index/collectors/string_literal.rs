@@ -8,11 +8,11 @@
 
 use tree_sitter::Node;
 
-use crate::index::collectors::{CollectorContext, write_scope_field};
-use crate::index::{
-    json_push_escaped_string, json_push_field_name, json_push_range_field, json_push_string_field,
-    json_push_usize_field,
+use crate::index::collectors::{
+    ArgumentPosition, CollectorContext, find_argument_position, write_argument_of_field,
+    write_scope_field,
 };
+use crate::index::{json_push_range_field, json_push_string_field};
 use crate::linter::lib::{SourceRange, get_node_text, get_range};
 use crate::node_kind::GDScriptNodeKind;
 
@@ -21,12 +21,6 @@ pub const TARGET_NODE_KINDS: &[GDScriptNodeKind] = &[
     GDScriptNodeKind::StringName,
     GDScriptNodeKind::NodePath,
 ];
-
-pub struct ArgumentPosition<'a> {
-    /// The name of the thing being called, when it is a plain name.
-    pub callee: Option<&'a str>,
-    pub index: usize,
-}
 
 pub struct StringLiteralRecord<'a> {
     pub value: String,
@@ -50,44 +44,6 @@ pub fn collect(node: &Node, context: &CollectorContext, output: &mut String) {
         argument_of: find_argument_position(node, context.source),
     };
     write_string_literal_record(&record, context.scope, output);
-}
-
-fn find_argument_position<'a>(node: &Node, source: &'a str) -> Option<ArgumentPosition<'a>> {
-    let parent = node.parent()?;
-    if GDScriptNodeKind::get_kind_from_ast_node(parent) != GDScriptNodeKind::Arguments {
-        return None;
-    }
-
-    let mut argument_index = 0;
-    let mut found_index = None;
-    for child_index in 0..parent.named_child_count() {
-        let Some(child) = parent.named_child(child_index as u32) else {
-            continue;
-        };
-        if GDScriptNodeKind::get_kind_from_ast_node(child) == GDScriptNodeKind::Comment {
-            continue;
-        }
-        if child.id() == node.id() {
-            found_index = Some(argument_index);
-            break;
-        }
-        argument_index += 1;
-    }
-    let index = found_index?;
-
-    let callee_owner = parent.parent()?;
-    let callee_owner_kind = GDScriptNodeKind::get_kind_from_ast_node(callee_owner);
-    let mut callee = None;
-    if matches!(
-        callee_owner_kind,
-        GDScriptNodeKind::Call | GDScriptNodeKind::AttributeCall | GDScriptNodeKind::Annotation
-    ) && let Some(first_child) = callee_owner.named_child(0)
-        && GDScriptNodeKind::get_kind_from_ast_node(first_child) == GDScriptNodeKind::Identifier
-    {
-        callee = Some(get_node_text(&first_child, source));
-    }
-
-    Some(ArgumentPosition { callee, index })
 }
 
 /// Returns the contents of a string literal with its escapes resolved.
@@ -171,17 +127,7 @@ fn write_string_literal_record(record: &StringLiteralRecord, scope: &str, output
     write_scope_field(scope, output);
     json_push_range_field("range", &record.range, output);
     if let Some(argument_of) = &record.argument_of {
-        json_push_field_name("argument_of", output);
-        output.push('{');
-        if let Some(callee) = argument_of.callee {
-            output.push_str("\"callee\":");
-            json_push_escaped_string(callee, output);
-            json_push_usize_field("index", argument_of.index, output);
-        } else {
-            output.push_str("\"index\":");
-            output.push_str(&argument_of.index.to_string());
-        }
-        output.push('}');
+        write_argument_of_field(argument_of, output);
     }
     output.push_str("}\n");
 }

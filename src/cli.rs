@@ -76,7 +76,12 @@ Arguments:
 
 Options:
   -x, --exclude <PATH>         Exclude a file or directory (may be repeated)
+      --project-root <PATH>   Directory the res:// paths are relative to
   -h, --help                  Print help
+
+Paths are res:// paths relative to the project root. Without --project-root the
+root is found by looking for project.godot above the input files. A run never
+mixes res:// paths with file system paths: anything that would is an error.
 ";
 
 /// Represents the parsed command-line arguments for the GDScript formatter. You
@@ -140,7 +145,11 @@ pub enum Command {
         do_pretty_print: bool,
     },
     /// Write a machine-readable index of GDScript files to stdout.
-    Index,
+    Index {
+        /// Directory the res:// paths are relative to. Discovered by looking
+        /// for project.godot above the input files when not given.
+        project_root: Option<PathBuf>,
+    },
 }
 
 /// Internal discriminator used during parsing to track which command's flags
@@ -173,6 +182,8 @@ pub fn parse_args() -> CliArguments {
     let mut lint_max_line_length: Option<usize> = None;
     let mut lint_list_rules = false;
     let mut lint_pretty_print = false;
+
+    let mut index_project_root: Option<PathBuf> = None;
 
     // The first positional argument optionally selects a command. If it is
     // "lint", we run the linter program. Defaults to the formatter.
@@ -395,6 +406,15 @@ pub fn parse_args() -> CliArguments {
                         );
                         excluded_paths.push(PathBuf::from(value));
                     }
+                    "project-root" => {
+                        let value = consume_flag_value(
+                            assigned_value,
+                            &argument_list,
+                            &mut current_argument_index,
+                            "--project-root",
+                        );
+                        index_project_root = Some(PathBuf::from(value));
+                    }
                     _ => print_error_invalid_argument(&format!(
                         "unexpected argument '--{}'",
                         flag_name
@@ -477,7 +497,9 @@ pub fn parse_args() -> CliArguments {
         ActiveCommand::Index => CliArguments {
             input_file_paths,
             excluded_paths,
-            command: Command::Index,
+            command: Command::Index {
+                project_root: index_project_root,
+            },
         },
     }
 }

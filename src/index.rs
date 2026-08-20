@@ -69,16 +69,28 @@ pub fn index_source(source: &str, display_path: &str, output: &mut String) -> bo
 /// least one file failed to parse; the caller turns that into an exit code.
 ///
 /// Diagnostics go to stderr so stdout stays parseable.
-pub fn index_gdscript_files(input_files: &[PathBuf]) -> Result<bool, Box<dyn std::error::Error>> {
+pub fn index_gdscript_files(
+    input_files: &[PathBuf],
+    explicit_project_root: Option<&Path>,
+) -> Result<bool, Box<dyn std::error::Error>> {
+    let project_root = resolve_project_root(input_files, explicit_project_root)?;
+    if project_root.is_none() {
+        // The consumer keys every record on a res:// path. A run that quietly
+        // produced file system paths would join nothing and report nothing,
+        // which reads exactly like a clean project.
+        eprintln!(
+            "Warning: no project.godot found above the input files, so paths are absolute rather than res:// paths. Pass --project-root to set the project root explicitly."
+        );
+    }
+
     let mut standard_output = BufWriter::new(std::io::stdout().lock());
-    let mut project_root_cache: HashMap<PathBuf, Option<PathBuf>> = HashMap::new();
     let mut record_buffer = String::new();
     let mut had_parse_errors = false;
 
     for file_path in input_files {
         let source = fs::read_to_string(file_path)
             .map_err(|error| format!("Failed to read file {}: {}", file_path.display(), error))?;
-        let display_path = build_display_path(file_path, &mut project_root_cache);
+        let display_path = build_display_path(file_path, project_root.as_deref())?;
 
         record_buffer.clear();
         let parsed_without_errors = index_source(&source, &display_path, &mut record_buffer);
@@ -96,48 +108,110 @@ pub fn index_gdscript_files(input_files: &[PathBuf]) -> Result<bool, Box<dyn std
     Ok(had_parse_errors)
 }
 
-/// Turns a file system path into the `res://` path Godot uses, when the file
-/// sits inside a Godot project. The consumer of the index matches records
-/// against scripts it loaded from the engine, and the engine only knows
-/// `res://` paths.
+/// Decides the one project root for the whole run.
 ///
-/// Falls back to the path as given when no `project.godot` is found above the
-/// file, so the sub-command stays useful outside a project.
-fn build_display_path(
-    file_path: &Path,
-    project_root_cache: &mut HashMap<PathBuf, Option<PathBuf>>,
-) -> String {
-    let absolute_path = match fs::canonicalize(file_path) {
-        Ok(absolute_path) => absolute_path,
-        Err(_) => return file_path.display().to_string(),
-    };
-    let Some(directory) = absolute_path.parent() else {
-        return file_path.display().to_string();
-    };
-
-    if !project_root_cache.contains_key(directory) {
-        let mut project_root = None;
-        let mut current_directory = Some(directory);
-        while let Some(candidate_directory) = current_directory {
-            if candidate_directory.join("project.godot").is_file() {
-                project_root = Some(candidate_directory.to_path_buf());
-                break;
-            }
-            current_directory = candidate_directory.parent();
-        }
-        project_root_cache.insert(directory.to_path_buf(), project_root);
+/// Every path in a run is either a `res://` path or a file system path, never a
+/// mixture: a consumer joining records on `res://` paths cannot tell a run that
+/// half-resolved from a project with no findings. So anything that would mix the
+/// two forms is an error that names the fix rather than a quiet fallback.
+///
+/// Discovery walks up from each input file looking for `project.godot`. An
+/// explicit `--project-root` skips discovery.
+pub fn resolve_project_root(
+    input_files: &[PathBuf],
+    explicit_project_root: Option<&Path>,
+) -> Result<Option<PathBuf>, String> {
+    if let Some(explicit_project_root) = explicit_project_root {
+        let canonical_root = fs::canonicalize(explicit_project_root).map_err(|error| {
+            format!(
+                "Failed to read the project root {}: {}",
+                explicit_project_root.display(),
+                error
+            )
+        })?;
+        return Ok(Some(canonical_root));
     }
 
-    let Some(Some(project_root)) = project_root_cache.get(directory) else {
-        return file_path.display().to_string();
+    let mut discovered_root: Option<PathBuf> = None;
+    let mut file_without_root: Option<PathBuf> = None;
+    let mut file_with_root: Option<PathBuf> = None;
+
+    for file_path in input_files {
+        let found_root = find_project_root_above(file_path);
+        let Some(found_root) = found_root else {
+            file_without_root = Some(file_path.clone());
+            continue;
+        };
+        if let Some(discovered_root) = &discovered_root
+            && *discovered_root != found_root
+        {
+            return Err(format!(
+                "Found two Godot projects in one run, {} and {}. Pass --project-root to say which one the res:// paths are relative to.",
+                discovered_root.display(),
+                found_root.display()
+            ));
+        }
+        file_with_root = Some(file_path.clone());
+        discovered_root = Some(found_root);
+    }
+
+    if let (Some(discovered_root), Some(file_without_root), Some(file_with_root)) =
+        (&discovered_root, &file_without_root, &file_with_root)
+    {
+        return Err(format!(
+            "{} is inside the Godot project {} but {} is not, so this run would mix res:// paths with file system paths. Pass --project-root, or index them separately.",
+            file_with_root.display(),
+            discovered_root.display(),
+            file_without_root.display()
+        ));
+    }
+
+    Ok(discovered_root)
+}
+
+fn find_project_root_above(file_path: &Path) -> Option<PathBuf> {
+    let absolute_path = fs::canonicalize(file_path).ok()?;
+    let mut current_directory = absolute_path.parent();
+    while let Some(candidate_directory) = current_directory {
+        if candidate_directory.join("project.godot").is_file() {
+            return Some(candidate_directory.to_path_buf());
+        }
+        current_directory = candidate_directory.parent();
+    }
+    None
+}
+
+/// Turns a file system path into the `res://` path Godot uses. The consumer
+/// matches records against scripts it loaded from the engine, and the engine
+/// knows nothing but `res://` paths.
+///
+/// Without a project root the absolute path is reported instead, which is at
+/// least deterministic: the same file always indexes under the same name
+/// whatever directory the command ran from.
+fn build_display_path(file_path: &Path, project_root: Option<&Path>) -> Result<String, String> {
+    let absolute_path = fs::canonicalize(file_path).map_err(|error| {
+        format!(
+            "Failed to resolve the path of {}: {}",
+            file_path.display(),
+            error
+        )
+    })?;
+
+    let Some(project_root) = project_root else {
+        return Ok(absolute_path.to_string_lossy().to_string());
     };
-    let Ok(relative_path) = absolute_path.strip_prefix(project_root) else {
-        return file_path.display().to_string();
-    };
+
+    let relative_path = absolute_path.strip_prefix(project_root).map_err(|_| {
+        format!(
+            "{} is outside the project root {}, so it has no res:// path. Index it separately or widen --project-root.",
+            absolute_path.display(),
+            project_root.display()
+        )
+    })?;
 
     let mut display_path = String::from("res://");
     display_path.push_str(&relative_path.to_string_lossy().replace('\\', "/"));
-    display_path
+    Ok(display_path)
 }
 
 fn write_file_header_record(display_path: &str, has_parse_error: bool, output: &mut String) {

@@ -65,8 +65,9 @@ Arguments:
               directory. Reads from stdin when piped.
 
 Options:
-  -x, --exclude <PATH>  Exclude one file or directory (repeatable)
-  -h, --help            Print help
+  -x, --exclude <PATH>      Exclude one file or directory (repeatable)
+      --project-root <PATH> Directory the res:// paths are relative to
+  -h, --help                Print help
 ```
 
 One invocation handles the whole project. The consumer must not spawn a process
@@ -74,11 +75,32 @@ per file.
 
 Output goes to stdout. Diagnostics go to stderr, so stdout stays parseable.
 
-The `path` in each `file` header is a `res://` path when the file sits inside a
-Godot project, found by looking for `project.godot` in the directories above it.
+### Paths
+
+The `path` in each `file` header is a `res://` path relative to the project root.
 The consumer matches records against scripts it loaded from the engine, and the
-engine knows nothing but `res://` paths. Outside a project the path is reported
-as given. Input piped on stdin is reported as `<stdin>`.
+engine knows nothing but `res://` paths.
+
+The root comes from `--project-root` when given. Otherwise it is discovered by
+walking up from each input file looking for `project.godot`.
+
+**A run never mixes the two forms.** Either every path is a `res://` path or
+every path is an absolute file system path. A run that half-resolved would join
+nothing on the consumer side and report no findings, which reads exactly like a
+clean project, so every case that would mix them is an error naming its fix
+rather than a quiet fallback:
+
+- Two different `project.godot` files above the inputs: error, pass
+  `--project-root`.
+- Some inputs inside a project and some outside it: error, pass
+  `--project-root` or index them separately.
+- An input outside an explicit `--project-root`: error.
+
+When no project is found at all, every path is absolute and a warning says so on
+stderr. Absolute rather than as-given, so the same file indexes under the same
+name whatever directory the command ran from.
+
+Input piped on stdin is reported as `<stdin>`.
 
 ## Output format
 
@@ -94,11 +116,27 @@ Each file produces a header record followed by its content records:
 {"record": "member_chain", ...}
 ```
 
+### Absent means empty, never unknown
+
 Fields that would carry nothing are left out rather than written as `null`, `[]`
-or `false`. A missing `annotations` means there were none, a missing `is_call`
-means it is not a call. This is the first of the two size mitigations under
-"Decisions taken", and it is why the elided example further down still shows
-them: that example predates the decision.
+or `false`. This is the first of the two size mitigations under "Decisions
+taken", and it is why the elided example further down still shows them: that
+example predates the decision.
+
+Absence is a guarantee, not an admission. The sub-command never omits a field
+because it could not work something out. Specifically:
+
+- An absent `annotations` or `modifiers` means there were none.
+- An absent `parameters` means zero parameters. Signal arity checking depends on
+  this, so it is the guarantee that matters most.
+- An absent `is_call`, `is_trailing`, `is_documentation` or `body_is_pass_only`
+  means false.
+- An absent `type` or `default` means none was written.
+- An absent `argument_of` means the record is not an argument.
+
+The one exception is `body_range`, which every `function` declaration reports
+either as a range or as an explicit `null`. It has to separate "has no body" from
+"is not a function", and absence cannot carry both.
 
 ### Ranges
 
@@ -180,6 +218,7 @@ off for `target` across a whole file.
 | `is_call` | true when followed by an argument list |
 | `arguments` | array of `{"text", "range"}`, source text trimmed |
 | `context` | see below |
+| `argument_of` | as on `string_literal` |
 
 ### `member_chain`
 
@@ -187,18 +226,37 @@ Attribute access, with or without a leading `self`.
 
 | Field | Notes |
 |-------|-------|
-| `segments` | array of `{"name", "range"}`, in order |
+| `segments` | array, in order, see below |
 | `range` | whole chain |
 | `scope` | |
 | `is_call` | true when the last segment is called |
 | `arguments` | as above |
 | `context` | see below |
-| `base` | `{"text", "range"}` when the chain starts from something that is not a name, else absent |
+| `argument_of` | as on `string_literal` |
 
-`base` covers `$Clock` in `$Clock.text` and `get_tree()` in
-`get_tree().paused`. Without it, a chain whose root cannot be named would arrive
-as a bare list of segments and look like it started at a name. A consumer
-resolving the chain has to know it cannot start.
+Every hop is a segment and every segment says what it is:
+
+| Field | Notes |
+|-------|-------|
+| `kind` | `identifier`, `self`, `call`, `node_path`, `subscript`, `other` |
+| `name` | the member name, when the segment has one |
+| `text` | the segment as written, for segments with no name |
+| `is_call` | true for a called segment |
+| `range` | the segment alone |
+
+A flat list of names loses what a consumer cannot recover. `$Clock.text` would
+arrive as a lone `text` and look like a member of the enclosing script.
+`self.get_thing().field` would make `get_thing` look like a property, so `field`
+gets checked against the wrong type. Both produce findings that are wrong rather
+than missing, which is the direction that costs a user trust.
+
+A consumer walking types stops at the first segment that is not `self` or
+`identifier`. `kind` is not resolution: it is an honest signal that the chain
+left the ground where hop-by-hop resolution is valid.
+
+`super` is reported as `other` rather than as an identifier. Resolving through it
+means resolving against the base class, which this index does not know, and
+calling it an identifier would invite exactly the wrong lookup.
 
 Per-segment ranges matter. `self.clock.ziggy` should be reported at `ziggy`, not
 at the start of the line.
@@ -218,6 +276,10 @@ apart, and it is absent for the common case.
 
 `argument_of` is how a consumer tells `self.call("late_bound")` apart from
 `print("all done")`. One is a reference to a method, the other is prose.
+
+`reference` and `member_chain` carry `argument_of` too, so a nested call such as
+`assert(is_instance_valid(thing))` reports each level directly instead of making
+the consumer re-parse the `arguments` text of the level above it.
 
 ### `comparison`
 
@@ -255,6 +317,23 @@ interval comparison rather than a guess.
 `statement` is the one that unlocks new checks: an expression whose context is
 `statement` and which is not a call does nothing at runtime.
 
+`condition` unlocks another: a method named but not called in a truth test is a
+`Callable`, which is always true, so the branch never varies. It is reported for
+every expression whose value is tested for truth, not only for the whole
+condition of a statement:
+
+- the condition of `if`, `elif`, `while` and of a ternary
+- both operands of `and` and `or`, including outside a condition, as in
+  `var ready := self.a and self.b`, because the value is still tested for truth
+- the operand of `not`
+
+The `not` of `is not` and `not in` does not count. Those spell a comparison, not
+a boolean operator, and their operands are `other`.
+
+Parentheses do not change a context. `if (self.predicate):` reports the same
+thing `if self.predicate:` does, because parentheses change how an expression is
+written and not what it does.
+
 `type` marks a name written as a type rather than used as a value: the `Label`
 in `var clock: Label`, the `int` in `Array[int]`, the `CanvasLayer` in
 `extends CanvasLayer`. Every identifier is emitted, so these appear whether or
@@ -263,6 +342,10 @@ not a consumer wants them; `type` is how it decides.
 The context is read from where the expression sits, not from the statement
 around it. In `return a + b`, the operands are `other` and the addition is the
 `return_value`. Widening it would make `statement` mean less than it does.
+
+**This set is open.** Values may be added as the index learns to tell more
+positions apart. Treat an unrecognised value as `other` rather than failing, so
+that adding one is not a breaking change. `type` was itself added this way.
 
 ## Worked example
 
@@ -296,6 +379,16 @@ Output, elided for readability:
 The `schema` field starts at 1 and increments on any breaking change to record
 shapes or field meanings. Adding a new record kind or an optional field is not
 breaking.
+
+**Schema 1 is not stable yet, and is not being treated as stable.** There is one
+consumer, it is being written alongside this sub-command, and the two are in
+direct contact. While that holds, record shapes change in place without a version
+bump whenever the consumer's experience says they should: the first round of
+feedback removed a field and restructured `member_chain.segments`, and schema
+stayed at 1. Do not build compatibility shims for older shapes, and do not
+hesitate to break something that is wrong. The schema starts incrementing when
+there is a second consumer or a tagged release that promises otherwise, and this
+paragraph is what says which regime is in force.
 
 Consumers must refuse a schema they do not know and exit non-zero.
 
@@ -425,3 +518,203 @@ is what "Decisions taken" asked for before adding one.
 not produce declarations, and `get = _get_y` setter and getter references do not
 produce `reference` records. Both are small gaps rather than design choices; add
 them when a consumer needs them.
+
+## Requirements from the first consumer
+
+Written after trying the first implementation against a real project. Ordered by
+importance. The first two are correctness problems, the rest are contracts I need
+stated so I can rely on them.
+
+**All five are implemented.** Each one below carries a note saying what shipped
+and where the answer differs from the request. Schema stayed at 1: see "Schema
+versioning and failure" for why nothing here needed a bump.
+
+### 1. Segments must say what they are
+
+A member chain is currently a flat list of names, which loses information the
+consumer cannot recover:
+
+```gdscript
+self.get_thing().field   ->  segments: self, get_thing, field
+$Clock.text              ->  segments: text
+```
+
+The first erases the call, so a consumer resolving hop by hop treats `get_thing`
+as a property and checks `field` against the wrong type. The second drops the
+receiver, so `text` looks like a member of the enclosing script.
+
+Both produce false findings rather than missing ones, which is the direction that
+costs a user trust.
+
+Give each segment a `kind` and an `is_call` flag:
+
+| `kind` | Example |
+|--------|---------|
+| `identifier` | `clock` in `self.clock.text` |
+| `self` | the leading `self` |
+| `call` | `get_thing` in `self.get_thing().field` |
+| `node_path` | `$Clock`, `%Clock` |
+| `subscript` | `items[0]` |
+| `other` | anything else |
+
+A consumer walking types stops at the first segment that is not `self` or
+`identifier`. That is all I need: not resolution, just an honest signal that the
+chain left the territory where hop-by-hop resolution is valid.
+
+> **Done.** Every hop is a segment now, including the receiver, so `$Clock.text`
+> reports `node_path` then `identifier` rather than a lone `text`. Segments carry
+> `kind`, `is_call`, and either a `name` or the `text` as written for hops that
+> have no name. The `base` field is gone: it existed to carry the unnamed
+> receiver and a typed segment does that job properly.
+>
+> One addition beyond the list: `super` is reported as `other`, not
+> `identifier`. Resolving through it means resolving against the base class,
+> which this index cannot know, and calling it an identifier would produce the
+> same class of false finding this request is about.
+
+### 2. Deterministic project-relative paths
+
+`path` is `res://...` when a `project.godot` is found by walking up, and an
+absolute path otherwise. The consumer keys every record on `res://` paths, so a
+run that silently produces absolute paths joins nothing and reports no findings,
+which is indistinguishable from a clean project.
+
+Add `--project-root <PATH>` to set the root explicitly, and document the discovery
+rule. When a root is known, every path in the run must be `res://`. Never mix the
+two forms in one run.
+
+> **Done.** `--project-root <PATH>` sets the root, discovery is documented under
+> "Paths", and three cases that would have mixed the two forms are now errors
+> that name their fix: two projects in one run, some inputs inside a project and
+> some outside, and an input outside an explicit root. When no project is found
+> at all, paths are absolute and a warning says so on stderr.
+>
+> The fallback is now an absolute path rather than the path as given, so a file
+> indexes under the same name whatever directory the command ran from.
+>
+> Exit codes separate the two failures: 2 means some files did not parse and the
+> rest still produced records, 1 means the run produced no usable index at all.
+
+### 3. State that absent means empty, never unknown
+
+Empty and false fields are omitted: `modifiers`, `annotations`, and
+`body_is_pass_only` only appear when they have content. That is the right call for
+size, but the consumer needs it written down as a guarantee, because "absent" and
+"could not determine" would mean different things and it cannot tell them apart.
+
+Specifically: an absent `body_is_pass_only` means false. An absent `parameters` on
+a function or signal means zero parameters, which is what signal arity checking
+depends on. A function with no body at all is identified by `body_range: null`.
+
+> **Done.** Written down as a guarantee under "Absent means empty, never
+> unknown", including the specific readings asked for here. `body_range` is now
+> emitted explicitly as `null` for a `function` with no body, since absence there
+> would have to mean two things at once.
+
+### 4. Document `context` as open
+
+The implementation emits `type`, which the specification above does not list. That
+is a good addition. State that the set may grow, and that consumers should treat
+an unrecognised value as `other` rather than failing, so adding a value later is
+not a breaking change.
+
+> **Done.** `type` is listed, and the set is documented as open with the
+> instruction to treat unknown values as `other`.
+
+### 5. Nice to have: `argument_of` beyond string literals
+
+`string_literal` carries `argument_of`, `reference` and `member_chain` do not.
+Calls do carry their `arguments` as source text, so this is derivable by parsing
+that text, and I can live without it. Direct `argument_of` on every record would
+remove the re-parsing, which matters most for nested calls such as
+`assert(is_instance_valid(thing))`.
+
+> **Done.** `reference` and `member_chain` carry `argument_of` on the same shape
+> as `string_literal`. It was a shared helper away, and that example now reports
+> `is_instance_valid` at index 0 of `assert` and `thing` at index 0 of
+> `is_instance_valid` without anyone re-parsing text.
+
+### Behaviour to keep
+
+These already work and the consumer depends on them:
+
+- One invocation indexes a directory tree, with `-x` to exclude.
+- A file that fails to parse emits its header with `"parse_error": true`, the run
+  continues, other files still emit records, and the exit code is non-zero.
+- Records follow their file's header in output order.
+- Ranges carry one-based rows and columns plus byte offsets.
+- `scope` nests through inner classes, for example `Inner._ready`.
+- `default` is present on variable declarations, which is how an `@export` opting
+  out with `= null` is recognised.
+- `modifiers` reports `abstract` and `static`, and `annotations` reports the
+  annotation names, both for same-line and own-line forms.
+- `string_literal.argument_of` names the callee and the argument index.
+- `comparison` carries `left` and `right` as text with ranges.
+
+### 6. Truth-test context must survive boolean operators
+
+Found while porting the second consumer check. An expression evaluated for its
+truthiness reports `context: "condition"` only when it is the whole condition:
+
+```gdscript
+if self.predicate:              # context: condition
+while self.predicate:           # context: condition
+assert(self.predicate)          # context: argument, argument_of names assert
+if self.flag and self.predicate:  # context: other   <- both operands
+if not self.predicate:            # context: other
+```
+
+The consumer reports a method used as a condition without being called, since the
+reference is a `Callable` and the branch is always taken. The last two forms are
+real occurrences of that bug and are currently indistinguishable from an ordinary
+expression.
+
+Report `condition` for any expression whose value is used as a boolean:
+
+- the condition of `if`, `elif`, `while`, and of a ternary
+- both operands of `and` and `or`
+- the operand of `not`
+
+Operands of `and` and `or` qualify even outside a condition, as in
+`var ready := self.a and self.b`, because the value is still tested for truth.
+
+`assert` needs no special case now that `argument_of` is emitted on member chains
+and references, which was requirement 5 and is already implemented.
+
+> **Done.** All three forms report `condition`, and they nest: in
+> `if self.a or (self.b and self.c):` all three chains are conditions.
+>
+> One addition beyond the list: parentheses no longer change a context, for any
+> context rather than just this one. `if (self.predicate):` was reporting `other`
+> for the same reason the `and` case was, and `return (value)` had the matching
+> problem. A parenthesis changes how an expression is written, not what it does.
+>
+> `is not` and `not in` are deliberately excluded. Their `not` belongs to a
+> comparison rather than to a boolean operator, and treating those operands as
+> truth-tested would report the bug this check looks for where it cannot be.
+
+### 7. Name the base class on the class declaration
+
+A class declaration record carries `name` but not what it extends. The base
+appears only as a `reference` with `context: "type"`, which is indistinguishable
+from a return type or a parameter type:
+
+```gdscript
+@icon("res://i.svg") class_name Foo extends Bar
+
+func x() -> void:      # `void` is also context: type
+```
+
+Add `extends` to the `class` declaration record, holding the base as written:
+a class name, or a `"res://path.gd"` string.
+
+The consumer needs this for scripts that Godot cannot compile. When a base script
+fails, every script extending it fails too, and reporting fifteen consequences
+instead of one root cause is noise. Resolving the base through the engine is not
+possible in exactly that case, because a script that does not compile has no base
+script to ask for. Tree-sitter parses these files fine, since the failures are
+semantic rather than syntactic, so the index is the only source that still works
+when it matters.
+
+Until this lands the consumer keeps a small text scan for `class_name` and
+`extends`, used only on scripts that failed to load.

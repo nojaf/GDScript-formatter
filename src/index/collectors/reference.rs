@@ -13,8 +13,9 @@
 use tree_sitter::Node;
 
 use crate::index::collectors::{
-    ArgumentRecord, CollectorContext, collect_arguments, find_expression_context, is_field_of,
-    write_arguments_field, write_scope_field,
+    ArgumentPosition, ArgumentRecord, CollectorContext, collect_arguments, find_argument_position,
+    find_expression_context, is_field_of, write_argument_of_field, write_arguments_field,
+    write_scope_field,
 };
 use crate::index::{json_push_bool_field, json_push_range_field, json_push_string_field};
 use crate::linter::lib::{SourceRange, get_node_text, get_range};
@@ -30,6 +31,7 @@ pub struct ReferenceRecord<'a> {
     pub is_call: bool,
     pub arguments: Vec<ArgumentRecord<'a>>,
     pub context: &'static str,
+    pub argument_of: Option<ArgumentPosition<'a>>,
 }
 
 pub fn collect(node: &Node, context: &CollectorContext, output: &mut String) {
@@ -47,7 +49,8 @@ pub fn collect(node: &Node, context: &CollectorContext, output: &mut String) {
         name_range,
         is_call: false,
         arguments: Vec::new(),
-        context: find_expression_context(node),
+        context: find_expression_context(node, context.source),
+        argument_of: find_argument_position(node, context.source),
     };
 
     // `print(a)` is one reference to `print`, not a reference plus an unrelated
@@ -56,7 +59,8 @@ pub fn collect(node: &Node, context: &CollectorContext, output: &mut String) {
     if parent_kind == GDScriptNodeKind::Call && is_first_named_child(&parent, node) {
         record.range = get_range(&parent);
         record.is_call = true;
-        record.context = find_expression_context(&parent);
+        record.context = find_expression_context(&parent, context.source);
+        record.argument_of = find_argument_position(&parent, context.source);
         if let Some(arguments_node) = parent.child_by_field_name("arguments") {
             collect_arguments(&arguments_node, context.source, &mut record.arguments);
         }
@@ -119,5 +123,8 @@ fn write_reference_record(record: &ReferenceRecord, scope: &str, output: &mut St
     }
     write_arguments_field(&record.arguments, output);
     json_push_string_field("context", record.context, output);
+    if let Some(argument_of) = &record.argument_of {
+        write_argument_of_field(argument_of, output);
+    }
     output.push_str("}\n");
 }

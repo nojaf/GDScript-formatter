@@ -8,6 +8,10 @@ This file documents the changes made to the formatter with each release.
 
 - Added `--verbose` option to print one line per formatted file (#227)
 - Added an `index` sub-command that writes a machine-readable index of GDScript declarations, references, member chains, string literals, comparisons and comments to stdout as JSON Lines, for tools that need source positions the engine cannot give them. See `docs/specification_index.md`
+- `index`: every member chain segment now reports its `kind` (`identifier`, `self`, `call`, `node_path`, `subscript`, `other`) and whether it is a call, so a consumer resolving a chain hop by hop knows where to stop instead of mistaking `$Clock.text` for a member of the enclosing script
+- `index`: added `--project-root <PATH>`, and a run now refuses to mix `res://` paths with file system paths rather than silently producing paths a consumer cannot join on
+- `index`: `reference` and `member_chain` records carry `argument_of`, so nested calls report their argument position without re-parsing argument text
+- `index`: `context` reports `condition` for every expression tested for truth, including both operands of `and` and `or` and the operand of `not`, so a method named but never called in `if flag and self.predicate:` is now distinguishable from an ordinary expression. Parentheses no longer change any context
 
 ### Changed
 

@@ -248,7 +248,7 @@ It exists for tools that know what your code *means* but not *where it is*. A st
 ```bash
 gdscript-formatter index
 gdscript-formatter index scenes/ -x scenes/generated
-gdscript-formatter index scripts/player.gd
+gdscript-formatter index --project-root . scripts/player.gd
 ```
 
 The output is [JSON Lines](https://jsonlines.org): one JSON object per line, no enclosing array, so a consumer can parse it incrementally and every line stays small enough for `JSON.parse_string` in GDScript. Each file contributes a header record followed by its content records:
@@ -259,11 +259,11 @@ The output is [JSON Lines](https://jsonlines.org): one JSON object per line, no 
 {"record":"member_chain","segments":[{"name":"self", ...},{"name":"clock", ...}], ...}
 ```
 
-Paths are reported as `res://` paths when the file sits inside a Godot project, so they match what the engine reports. One invocation handles a whole project: do not spawn a process per file.
+Paths are reported as `res://` paths so they match what the engine reports. The project root comes from `--project-root`, or from looking for `project.godot` above the input files. A run never mixes `res://` paths with file system paths: anything that would (two projects in one run, inputs both inside and outside a project, an input outside an explicit root) is an error rather than a quiet fallback, because a half-resolved run joins nothing on the consumer side and looks exactly like a clean project. One invocation handles a whole project: do not spawn a process per file.
 
 The sub-command exits with code 2 when a file fails to parse, and names that file on stderr. The file still gets a header record carrying `"parse_error": true`, so a consumer can tell "no records because the file is broken" apart from "no records because nothing matched". Diagnostics always go to stderr, so stdout stays parseable.
 
-The record shapes, the `scope` and `context` values and the reasoning behind each of them are documented in [docs/specification_index.md](docs/specification_index.md).
+The record shapes, the `scope` and `context` values and the reasoning behind each of them are documented in [docs/specification_index.md](docs/specification_index.md). Note that schema 1 is not stable yet: there is one consumer being written alongside this sub-command, and record shapes still change in place when its experience says they should.
 
 ## Using the formatter in code editors
 

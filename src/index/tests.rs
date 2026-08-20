@@ -2,10 +2,11 @@
 mod index_tests {
     #![allow(clippy::unwrap_used)]
     use crate::FormatterConfiguration;
-    use crate::index::index_source;
+    use crate::index::{index_source, resolve_project_root};
     use crate::linter::lib::get_range;
     use crate::node_kind::GDScriptNodeKind;
     use crate::parser::ParseInput;
+    use std::path::PathBuf;
 
     /// Indexes one source and returns every line it wrote.
     ///
@@ -39,9 +40,9 @@ func _process(_delta: float) -> void:
 {"record":"declaration","kind":"parameter","name":"_delta","scope":"_process","range":{"start_row":6,"start_column":15,"end_row":6,"end_column":28,"start_byte":86,"end_byte":99},"name_range":{"start_row":6,"start_column":15,"end_row":6,"end_column":21,"start_byte":86,"end_byte":92},"type":"float"}
 {"record":"reference","name":"float","scope":"_process","range":{"start_row":6,"start_column":23,"end_row":6,"end_column":28,"start_byte":94,"end_byte":99},"name_range":{"start_row":6,"start_column":23,"end_row":6,"end_column":28,"start_byte":94,"end_byte":99},"context":"type"}
 {"record":"reference","name":"void","scope":"_process","range":{"start_row":6,"start_column":33,"end_row":6,"end_column":37,"start_byte":104,"end_byte":108},"name_range":{"start_row":6,"start_column":33,"end_row":6,"end_column":37,"start_byte":104,"end_byte":108},"context":"type"}
-{"record":"member_chain","segments":[{"name":"self","range":{"start_row":7,"start_column":2,"end_row":7,"end_column":6,"start_byte":111,"end_byte":115}},{"name":"clock","range":{"start_row":7,"start_column":7,"end_row":7,"end_column":12,"start_byte":116,"end_byte":121}},{"name":"ziggy","range":{"start_row":7,"start_column":13,"end_row":7,"end_column":18,"start_byte":122,"end_byte":127}}],"scope":"_process","range":{"start_row":7,"start_column":2,"end_row":7,"end_column":18,"start_byte":111,"end_byte":127},"context":"assignment_target"}
+{"record":"member_chain","segments":[{"kind":"self","name":"self","range":{"start_row":7,"start_column":2,"end_row":7,"end_column":6,"start_byte":111,"end_byte":115}},{"kind":"identifier","name":"clock","range":{"start_row":7,"start_column":7,"end_row":7,"end_column":12,"start_byte":116,"end_byte":121}},{"kind":"identifier","name":"ziggy","range":{"start_row":7,"start_column":13,"end_row":7,"end_column":18,"start_byte":122,"end_byte":127}}],"scope":"_process","range":{"start_row":7,"start_column":2,"end_row":7,"end_column":18,"start_byte":111,"end_byte":127},"context":"assignment_target"}
 {"record":"string_literal","value":"x","scope":"_process","range":{"start_row":7,"start_column":21,"end_row":7,"end_column":24,"start_byte":130,"end_byte":133}}
-{"record":"member_chain","segments":[{"name":"self","range":{"start_row":8,"start_column":2,"end_row":8,"end_column":6,"start_byte":135,"end_byte":139}},{"name":"call","range":{"start_row":8,"start_column":7,"end_row":8,"end_column":11,"start_byte":140,"end_byte":144}}],"scope":"_process","range":{"start_row":8,"start_column":2,"end_row":8,"end_column":25,"start_byte":135,"end_byte":158},"is_call":true,"arguments":[{"text":"\"late_bound\"","range":{"start_row":8,"start_column":12,"end_row":8,"end_column":24,"start_byte":145,"end_byte":157}}],"context":"statement"}
+{"record":"member_chain","segments":[{"kind":"self","name":"self","range":{"start_row":8,"start_column":2,"end_row":8,"end_column":6,"start_byte":135,"end_byte":139}},{"kind":"call","name":"call","is_call":true,"range":{"start_row":8,"start_column":7,"end_row":8,"end_column":25,"start_byte":140,"end_byte":158}}],"scope":"_process","range":{"start_row":8,"start_column":2,"end_row":8,"end_column":25,"start_byte":135,"end_byte":158},"is_call":true,"arguments":[{"text":"\"late_bound\"","range":{"start_row":8,"start_column":12,"end_row":8,"end_column":24,"start_byte":145,"end_byte":157}}],"context":"statement"}
 {"record":"string_literal","value":"late_bound","scope":"_process","range":{"start_row":8,"start_column":12,"end_row":8,"end_column":24,"start_byte":145,"end_byte":157},"argument_of":{"callee":"call","index":0}}
 "#####;
         assert_eq!(index_to_string(source), expected);
@@ -57,7 +58,7 @@ static func helper() -> void:
 	pass
 "#####;
         let expected = r#####"{"record":"file","schema":1,"path":"res://test.gd"}
-{"record":"declaration","kind":"function","name":"may_target","scope":"","range":{"start_row":1,"start_column":1,"end_row":1,"end_column":51,"start_byte":0,"end_byte":50},"name_range":{"start_row":1,"start_column":16,"end_row":1,"end_column":26,"start_byte":15,"end_byte":25},"type":"bool","annotations":[{"name":"abstract","range":{"start_row":1,"start_column":1,"end_row":1,"end_column":10,"start_byte":0,"end_byte":9}}],"modifiers":["abstract"],"parameters":[{"name":"candidate","type":"Node","range":{"start_row":1,"start_column":27,"end_row":1,"end_column":42,"start_byte":26,"end_byte":41}}]}
+{"record":"declaration","kind":"function","name":"may_target","scope":"","range":{"start_row":1,"start_column":1,"end_row":1,"end_column":51,"start_byte":0,"end_byte":50},"name_range":{"start_row":1,"start_column":16,"end_row":1,"end_column":26,"start_byte":15,"end_byte":25},"type":"bool","annotations":[{"name":"abstract","range":{"start_row":1,"start_column":1,"end_row":1,"end_column":10,"start_byte":0,"end_byte":9}}],"modifiers":["abstract"],"parameters":[{"name":"candidate","type":"Node","range":{"start_row":1,"start_column":27,"end_row":1,"end_column":42,"start_byte":26,"end_byte":41}}],"body_range":null}
 {"record":"declaration","kind":"parameter","name":"candidate","scope":"may_target","range":{"start_row":1,"start_column":27,"end_row":1,"end_column":42,"start_byte":26,"end_byte":41},"name_range":{"start_row":1,"start_column":27,"end_row":1,"end_column":36,"start_byte":26,"end_byte":35},"type":"Node"}
 {"record":"reference","name":"Node","scope":"may_target","range":{"start_row":1,"start_column":38,"end_row":1,"end_column":42,"start_byte":37,"end_byte":41},"name_range":{"start_row":1,"start_column":38,"end_row":1,"end_column":42,"start_byte":37,"end_byte":41},"context":"type"}
 {"record":"reference","name":"bool","scope":"may_target","range":{"start_row":1,"start_column":47,"end_row":1,"end_column":51,"start_byte":46,"end_byte":50},"name_range":{"start_row":1,"start_column":47,"end_row":1,"end_column":51,"start_byte":46,"end_byte":50},"context":"type"}
@@ -84,7 +85,7 @@ class Inner:
 {"record":"reference","name":"void","scope":"Inner._ready","range":{"start_row":4,"start_column":19,"end_row":4,"end_column":23,"start_byte":48,"end_byte":52},"name_range":{"start_row":4,"start_column":19,"end_row":4,"end_column":23,"start_byte":48,"end_byte":52},"context":"type"}
 {"record":"declaration","kind":"variable","name":"target","scope":"Inner._ready","range":{"start_row":5,"start_column":3,"end_row":5,"end_column":18,"start_byte":56,"end_byte":71},"name_range":{"start_row":5,"start_column":7,"end_row":5,"end_column":13,"start_byte":60,"end_byte":66},"default":"2"}
 {"record":"reference","name":"print","scope":"Inner._ready","range":{"start_row":6,"start_column":3,"end_row":6,"end_column":16,"start_byte":74,"end_byte":87},"name_range":{"start_row":6,"start_column":3,"end_row":6,"end_column":8,"start_byte":74,"end_byte":79},"is_call":true,"arguments":[{"text":"target","range":{"start_row":6,"start_column":9,"end_row":6,"end_column":15,"start_byte":80,"end_byte":86}}],"context":"statement"}
-{"record":"reference","name":"target","scope":"Inner._ready","range":{"start_row":6,"start_column":9,"end_row":6,"end_column":15,"start_byte":80,"end_byte":86},"name_range":{"start_row":6,"start_column":9,"end_row":6,"end_column":15,"start_byte":80,"end_byte":86},"context":"argument"}
+{"record":"reference","name":"target","scope":"Inner._ready","range":{"start_row":6,"start_column":9,"end_row":6,"end_column":15,"start_byte":80,"end_byte":86},"name_range":{"start_row":6,"start_column":9,"end_row":6,"end_column":15,"start_byte":80,"end_byte":86},"context":"argument","argument_of":{"callee":"print","index":0}}
 "#####;
         assert_eq!(index_to_string(source), expected);
     }
@@ -113,7 +114,7 @@ enum { LOOSE }
         let expected = r#####"{"record":"file","schema":1,"path":"res://test.gd"}
 {"record":"declaration","kind":"function","name":"_ready","scope":"","range":{"start_row":1,"start_column":1,"end_row":4,"end_column":22,"start_byte":0,"end_byte":88},"name_range":{"start_row":1,"start_column":6,"end_row":1,"end_column":12,"start_byte":5,"end_byte":11},"type":"void","body_range":{"start_row":1,"start_column":23,"end_row":4,"end_column":22,"start_byte":22,"end_byte":88}}
 {"record":"reference","name":"void","scope":"_ready","range":{"start_row":1,"start_column":18,"end_row":1,"end_column":22,"start_byte":17,"end_byte":21},"name_range":{"start_row":1,"start_column":18,"end_row":1,"end_column":22,"start_byte":17,"end_byte":21},"context":"type"}
-{"record":"member_chain","segments":[{"name":"self","range":{"start_row":2,"start_column":2,"end_row":2,"end_column":6,"start_byte":24,"end_byte":28}},{"name":"call","range":{"start_row":2,"start_column":7,"end_row":2,"end_column":11,"start_byte":29,"end_byte":33}}],"scope":"_ready","range":{"start_row":2,"start_column":2,"end_row":2,"end_column":25,"start_byte":24,"end_byte":47},"is_call":true,"arguments":[{"text":"\"late_bound\"","range":{"start_row":2,"start_column":12,"end_row":2,"end_column":24,"start_byte":34,"end_byte":46}}],"context":"statement"}
+{"record":"member_chain","segments":[{"kind":"self","name":"self","range":{"start_row":2,"start_column":2,"end_row":2,"end_column":6,"start_byte":24,"end_byte":28}},{"kind":"call","name":"call","is_call":true,"range":{"start_row":2,"start_column":7,"end_row":2,"end_column":25,"start_byte":29,"end_byte":47}}],"scope":"_ready","range":{"start_row":2,"start_column":2,"end_row":2,"end_column":25,"start_byte":24,"end_byte":47},"is_call":true,"arguments":[{"text":"\"late_bound\"","range":{"start_row":2,"start_column":12,"end_row":2,"end_column":24,"start_byte":34,"end_byte":46}}],"context":"statement"}
 {"record":"string_literal","value":"late_bound","scope":"_ready","range":{"start_row":2,"start_column":12,"end_row":2,"end_column":24,"start_byte":34,"end_byte":46},"argument_of":{"callee":"call","index":0}}
 {"record":"reference","name":"print","scope":"_ready","range":{"start_row":3,"start_column":2,"end_row":3,"end_column":19,"start_byte":49,"end_byte":66},"name_range":{"start_row":3,"start_column":2,"end_row":3,"end_column":7,"start_byte":49,"end_byte":54},"is_call":true,"arguments":[{"text":"\"all done\"","range":{"start_row":3,"start_column":8,"end_row":3,"end_column":18,"start_byte":55,"end_byte":65}}],"context":"statement"}
 {"record":"string_literal","value":"all done","scope":"_ready","range":{"start_row":3,"start_column":8,"end_row":3,"end_column":18,"start_byte":55,"end_byte":65},"argument_of":{"callee":"print","index":0}}
@@ -124,18 +125,38 @@ enum { LOOSE }
     }
 
     #[test]
-    fn test_member_chains_report_a_base_when_it_is_not_a_name() {
+    fn test_segments_say_what_kind_of_hop_they_are() {
         let source = r#####"func _ready() -> void:
+	self.get_thing().field = 1
 	$Clock.text = "12:00"
-	get_tree().create_timer(1.0).timeout
+	items[0].name = "a"
+	super._process(1.0)
 "#####;
         let expected = r#####"{"record":"file","schema":1,"path":"res://test.gd"}
-{"record":"declaration","kind":"function","name":"_ready","scope":"","range":{"start_row":1,"start_column":1,"end_row":3,"end_column":38,"start_byte":0,"end_byte":83},"name_range":{"start_row":1,"start_column":6,"end_row":1,"end_column":12,"start_byte":5,"end_byte":11},"type":"void","body_range":{"start_row":1,"start_column":23,"end_row":3,"end_column":38,"start_byte":22,"end_byte":83}}
+{"record":"declaration","kind":"function","name":"_ready","scope":"","range":{"start_row":1,"start_column":1,"end_row":5,"end_column":21,"start_byte":0,"end_byte":115},"name_range":{"start_row":1,"start_column":6,"end_row":1,"end_column":12,"start_byte":5,"end_byte":11},"type":"void","body_range":{"start_row":1,"start_column":23,"end_row":5,"end_column":21,"start_byte":22,"end_byte":115}}
 {"record":"reference","name":"void","scope":"_ready","range":{"start_row":1,"start_column":18,"end_row":1,"end_column":22,"start_byte":17,"end_byte":21},"name_range":{"start_row":1,"start_column":18,"end_row":1,"end_column":22,"start_byte":17,"end_byte":21},"context":"type"}
-{"record":"member_chain","segments":[{"name":"text","range":{"start_row":2,"start_column":9,"end_row":2,"end_column":13,"start_byte":31,"end_byte":35}}],"base":{"text":"$Clock","range":{"start_row":2,"start_column":2,"end_row":2,"end_column":8,"start_byte":24,"end_byte":30}},"scope":"_ready","range":{"start_row":2,"start_column":2,"end_row":2,"end_column":13,"start_byte":24,"end_byte":35},"context":"assignment_target"}
-{"record":"string_literal","value":"12:00","scope":"_ready","range":{"start_row":2,"start_column":16,"end_row":2,"end_column":23,"start_byte":38,"end_byte":45}}
-{"record":"member_chain","segments":[{"name":"create_timer","range":{"start_row":3,"start_column":13,"end_row":3,"end_column":25,"start_byte":58,"end_byte":70}},{"name":"timeout","range":{"start_row":3,"start_column":31,"end_row":3,"end_column":38,"start_byte":76,"end_byte":83}}],"base":{"text":"get_tree()","range":{"start_row":3,"start_column":2,"end_row":3,"end_column":12,"start_byte":47,"end_byte":57}},"scope":"_ready","range":{"start_row":3,"start_column":2,"end_row":3,"end_column":38,"start_byte":47,"end_byte":83},"context":"statement"}
-{"record":"reference","name":"get_tree","scope":"_ready","range":{"start_row":3,"start_column":2,"end_row":3,"end_column":12,"start_byte":47,"end_byte":57},"name_range":{"start_row":3,"start_column":2,"end_row":3,"end_column":10,"start_byte":47,"end_byte":55},"is_call":true,"context":"other"}
+{"record":"member_chain","segments":[{"kind":"self","name":"self","range":{"start_row":2,"start_column":2,"end_row":2,"end_column":6,"start_byte":24,"end_byte":28}},{"kind":"call","name":"get_thing","is_call":true,"range":{"start_row":2,"start_column":7,"end_row":2,"end_column":18,"start_byte":29,"end_byte":40}},{"kind":"identifier","name":"field","range":{"start_row":2,"start_column":19,"end_row":2,"end_column":24,"start_byte":41,"end_byte":46}}],"scope":"_ready","range":{"start_row":2,"start_column":2,"end_row":2,"end_column":24,"start_byte":24,"end_byte":46},"context":"assignment_target"}
+{"record":"member_chain","segments":[{"kind":"node_path","text":"$Clock","range":{"start_row":3,"start_column":2,"end_row":3,"end_column":8,"start_byte":52,"end_byte":58}},{"kind":"identifier","name":"text","range":{"start_row":3,"start_column":9,"end_row":3,"end_column":13,"start_byte":59,"end_byte":63}}],"scope":"_ready","range":{"start_row":3,"start_column":2,"end_row":3,"end_column":13,"start_byte":52,"end_byte":63},"context":"assignment_target"}
+{"record":"string_literal","value":"12:00","scope":"_ready","range":{"start_row":3,"start_column":16,"end_row":3,"end_column":23,"start_byte":66,"end_byte":73}}
+{"record":"member_chain","segments":[{"kind":"subscript","name":"items","range":{"start_row":4,"start_column":2,"end_row":4,"end_column":10,"start_byte":75,"end_byte":83}},{"kind":"identifier","name":"name","range":{"start_row":4,"start_column":11,"end_row":4,"end_column":15,"start_byte":84,"end_byte":88}}],"scope":"_ready","range":{"start_row":4,"start_column":2,"end_row":4,"end_column":15,"start_byte":75,"end_byte":88},"context":"assignment_target"}
+{"record":"reference","name":"items","scope":"_ready","range":{"start_row":4,"start_column":2,"end_row":4,"end_column":7,"start_byte":75,"end_byte":80},"name_range":{"start_row":4,"start_column":2,"end_row":4,"end_column":7,"start_byte":75,"end_byte":80},"context":"other"}
+{"record":"string_literal","value":"a","scope":"_ready","range":{"start_row":4,"start_column":18,"end_row":4,"end_column":21,"start_byte":91,"end_byte":94}}
+{"record":"member_chain","segments":[{"kind":"other","name":"super","range":{"start_row":5,"start_column":2,"end_row":5,"end_column":7,"start_byte":96,"end_byte":101}},{"kind":"call","name":"_process","is_call":true,"range":{"start_row":5,"start_column":8,"end_row":5,"end_column":21,"start_byte":102,"end_byte":115}}],"scope":"_ready","range":{"start_row":5,"start_column":2,"end_row":5,"end_column":21,"start_byte":96,"end_byte":115},"is_call":true,"arguments":[{"text":"1.0","range":{"start_row":5,"start_column":17,"end_row":5,"end_column":20,"start_byte":111,"end_byte":114}}],"context":"statement"}
+"#####;
+        assert_eq!(index_to_string(source), expected);
+    }
+
+    #[test]
+    fn test_nested_calls_report_their_argument_position() {
+        let source = r#####"func _ready() -> void:
+	assert(is_instance_valid(thing))
+"#####;
+        let expected = r#####"{"record":"file","schema":1,"path":"res://test.gd"}
+{"record":"declaration","kind":"function","name":"_ready","scope":"","range":{"start_row":1,"start_column":1,"end_row":2,"end_column":34,"start_byte":0,"end_byte":56},"name_range":{"start_row":1,"start_column":6,"end_row":1,"end_column":12,"start_byte":5,"end_byte":11},"type":"void","body_range":{"start_row":1,"start_column":23,"end_row":2,"end_column":34,"start_byte":22,"end_byte":56}}
+{"record":"reference","name":"void","scope":"_ready","range":{"start_row":1,"start_column":18,"end_row":1,"end_column":22,"start_byte":17,"end_byte":21},"name_range":{"start_row":1,"start_column":18,"end_row":1,"end_column":22,"start_byte":17,"end_byte":21},"context":"type"}
+{"record":"reference","name":"assert","scope":"_ready","range":{"start_row":2,"start_column":2,"end_row":2,"end_column":34,"start_byte":24,"end_byte":56},"name_range":{"start_row":2,"start_column":2,"end_row":2,"end_column":8,"start_byte":24,"end_byte":30},"is_call":true,"arguments":[{"text":"is_instance_valid(thing)","range":{"start_row":2,"start_column":9,"end_row":2,"end_column":33,"start_byte":31,"end_byte":55}}],"context":"statement"}
+{"record":"reference","name":"is_instance_valid","scope":"_ready","range":{"start_row":2,"start_column":9,"end_row":2,"end_column":33,"start_byte":31,"end_byte":55},"name_range":{"start_row":2,"start_column":9,"end_row":2,"end_column":26,"start_byte":31,"end_byte":48},"is_call":true,"arguments":[{"text":"thing","range":{"start_row":2,"start_column":27,"end_row":2,"end_column":32,"start_byte":49,"end_byte":54}}],"context":"argument","argument_of":{"callee":"assert","index":0}}
+{"record":"reference","name":"thing","scope":"_ready","range":{"start_row":2,"start_column":27,"end_row":2,"end_column":32,"start_byte":49,"end_byte":54},"name_range":{"start_row":2,"start_column":27,"end_row":2,"end_column":32,"start_byte":49,"end_byte":54},"context":"argument","argument_of":{"callee":"is_instance_valid","index":0}}
 "#####;
         assert_eq!(index_to_string(source), expected);
     }
@@ -184,7 +205,50 @@ var health := 5  # trailing
 {"record":"declaration","kind":"variable","name":"item","scope":"_ready","range":{"start_row":2,"start_column":6,"end_row":2,"end_column":10,"start_byte":28,"end_byte":32},"name_range":{"start_row":2,"start_column":6,"end_row":2,"end_column":10,"start_byte":28,"end_byte":32},"type":"int"}
 {"record":"reference","name":"int","scope":"_ready","range":{"start_row":2,"start_column":12,"end_row":2,"end_column":15,"start_byte":34,"end_byte":37},"name_range":{"start_row":2,"start_column":12,"end_row":2,"end_column":15,"start_byte":34,"end_byte":37},"context":"type"}
 {"record":"reference","name":"print","scope":"_ready","range":{"start_row":3,"start_column":3,"end_row":3,"end_column":14,"start_byte":51,"end_byte":62},"name_range":{"start_row":3,"start_column":3,"end_row":3,"end_column":8,"start_byte":51,"end_byte":56},"is_call":true,"arguments":[{"text":"item","range":{"start_row":3,"start_column":9,"end_row":3,"end_column":13,"start_byte":57,"end_byte":61}}],"context":"statement"}
-{"record":"reference","name":"item","scope":"_ready","range":{"start_row":3,"start_column":9,"end_row":3,"end_column":13,"start_byte":57,"end_byte":61},"name_range":{"start_row":3,"start_column":9,"end_row":3,"end_column":13,"start_byte":57,"end_byte":61},"context":"argument"}
+{"record":"reference","name":"item","scope":"_ready","range":{"start_row":3,"start_column":9,"end_row":3,"end_column":13,"start_byte":57,"end_byte":61},"name_range":{"start_row":3,"start_column":9,"end_row":3,"end_column":13,"start_byte":57,"end_byte":61},"context":"argument","argument_of":{"callee":"print","index":0}}
+"#####;
+        assert_eq!(index_to_string(source), expected);
+    }
+
+    #[test]
+    fn test_a_function_with_no_body_reports_body_range_null() {
+        let source = r#####"@abstract func may_target(candidate: Node) -> bool
+"#####;
+        let expected = r#####"{"record":"file","schema":1,"path":"res://test.gd"}
+{"record":"declaration","kind":"function","name":"may_target","scope":"","range":{"start_row":1,"start_column":1,"end_row":1,"end_column":51,"start_byte":0,"end_byte":50},"name_range":{"start_row":1,"start_column":16,"end_row":1,"end_column":26,"start_byte":15,"end_byte":25},"type":"bool","annotations":[{"name":"abstract","range":{"start_row":1,"start_column":1,"end_row":1,"end_column":10,"start_byte":0,"end_byte":9}}],"modifiers":["abstract"],"parameters":[{"name":"candidate","type":"Node","range":{"start_row":1,"start_column":27,"end_row":1,"end_column":42,"start_byte":26,"end_byte":41}}],"body_range":null}
+{"record":"declaration","kind":"parameter","name":"candidate","scope":"may_target","range":{"start_row":1,"start_column":27,"end_row":1,"end_column":42,"start_byte":26,"end_byte":41},"name_range":{"start_row":1,"start_column":27,"end_row":1,"end_column":36,"start_byte":26,"end_byte":35},"type":"Node"}
+{"record":"reference","name":"Node","scope":"may_target","range":{"start_row":1,"start_column":38,"end_row":1,"end_column":42,"start_byte":37,"end_byte":41},"name_range":{"start_row":1,"start_column":38,"end_row":1,"end_column":42,"start_byte":37,"end_byte":41},"context":"type"}
+{"record":"reference","name":"bool","scope":"may_target","range":{"start_row":1,"start_column":47,"end_row":1,"end_column":51,"start_byte":46,"end_byte":50},"name_range":{"start_row":1,"start_column":47,"end_row":1,"end_column":51,"start_byte":46,"end_byte":50},"context":"type"}
+"#####;
+        assert_eq!(index_to_string(source), expected);
+    }
+
+    /// A method named but not called in a truth test is a `Callable`, which is
+    /// always true, so the branch never varies. That check only works if the
+    /// context survives the boolean operators people actually write.
+    #[test]
+    fn test_truth_tests_survive_boolean_operators() {
+        let source = r#####"func _ready() -> void:
+	if self.flag and self.predicate:
+		pass
+	if not self.predicate:
+		pass
+	var ready := self.a or self.b
+	if self.a is not Node:
+		pass
+"#####;
+        let expected = r#####"{"record":"file","schema":1,"path":"res://test.gd"}
+{"record":"declaration","kind":"function","name":"_ready","scope":"","range":{"start_row":1,"start_column":1,"end_row":8,"end_column":7,"start_byte":0,"end_byte":156},"name_range":{"start_row":1,"start_column":6,"end_row":1,"end_column":12,"start_byte":5,"end_byte":11},"type":"void","body_range":{"start_row":1,"start_column":23,"end_row":8,"end_column":7,"start_byte":22,"end_byte":156}}
+{"record":"reference","name":"void","scope":"_ready","range":{"start_row":1,"start_column":18,"end_row":1,"end_column":22,"start_byte":17,"end_byte":21},"name_range":{"start_row":1,"start_column":18,"end_row":1,"end_column":22,"start_byte":17,"end_byte":21},"context":"type"}
+{"record":"member_chain","segments":[{"kind":"self","name":"self","range":{"start_row":2,"start_column":5,"end_row":2,"end_column":9,"start_byte":27,"end_byte":31}},{"kind":"identifier","name":"flag","range":{"start_row":2,"start_column":10,"end_row":2,"end_column":14,"start_byte":32,"end_byte":36}}],"scope":"_ready","range":{"start_row":2,"start_column":5,"end_row":2,"end_column":14,"start_byte":27,"end_byte":36},"context":"condition"}
+{"record":"member_chain","segments":[{"kind":"self","name":"self","range":{"start_row":2,"start_column":19,"end_row":2,"end_column":23,"start_byte":41,"end_byte":45}},{"kind":"identifier","name":"predicate","range":{"start_row":2,"start_column":24,"end_row":2,"end_column":33,"start_byte":46,"end_byte":55}}],"scope":"_ready","range":{"start_row":2,"start_column":19,"end_row":2,"end_column":33,"start_byte":41,"end_byte":55},"context":"condition"}
+{"record":"member_chain","segments":[{"kind":"self","name":"self","range":{"start_row":4,"start_column":9,"end_row":4,"end_column":13,"start_byte":72,"end_byte":76}},{"kind":"identifier","name":"predicate","range":{"start_row":4,"start_column":14,"end_row":4,"end_column":23,"start_byte":77,"end_byte":86}}],"scope":"_ready","range":{"start_row":4,"start_column":9,"end_row":4,"end_column":23,"start_byte":72,"end_byte":86},"context":"condition"}
+{"record":"declaration","kind":"variable","name":"ready","scope":"_ready","range":{"start_row":6,"start_column":2,"end_row":6,"end_column":31,"start_byte":96,"end_byte":125},"name_range":{"start_row":6,"start_column":6,"end_row":6,"end_column":11,"start_byte":100,"end_byte":105},"default":"self.a or self.b"}
+{"record":"member_chain","segments":[{"kind":"self","name":"self","range":{"start_row":6,"start_column":15,"end_row":6,"end_column":19,"start_byte":109,"end_byte":113}},{"kind":"identifier","name":"a","range":{"start_row":6,"start_column":20,"end_row":6,"end_column":21,"start_byte":114,"end_byte":115}}],"scope":"_ready","range":{"start_row":6,"start_column":15,"end_row":6,"end_column":21,"start_byte":109,"end_byte":115},"context":"condition"}
+{"record":"member_chain","segments":[{"kind":"self","name":"self","range":{"start_row":6,"start_column":25,"end_row":6,"end_column":29,"start_byte":119,"end_byte":123}},{"kind":"identifier","name":"b","range":{"start_row":6,"start_column":30,"end_row":6,"end_column":31,"start_byte":124,"end_byte":125}}],"scope":"_ready","range":{"start_row":6,"start_column":25,"end_row":6,"end_column":31,"start_byte":119,"end_byte":125},"context":"condition"}
+{"record":"comparison","operator":"is not","left":{"text":"self.a","range":{"start_row":7,"start_column":5,"end_row":7,"end_column":11,"start_byte":130,"end_byte":136}},"right":{"text":"Node","range":{"start_row":7,"start_column":19,"end_row":7,"end_column":23,"start_byte":144,"end_byte":148}},"scope":"_ready","range":{"start_row":7,"start_column":5,"end_row":7,"end_column":23,"start_byte":130,"end_byte":148}}
+{"record":"member_chain","segments":[{"kind":"self","name":"self","range":{"start_row":7,"start_column":5,"end_row":7,"end_column":9,"start_byte":130,"end_byte":134}},{"kind":"identifier","name":"a","range":{"start_row":7,"start_column":10,"end_row":7,"end_column":11,"start_byte":135,"end_byte":136}}],"scope":"_ready","range":{"start_row":7,"start_column":5,"end_row":7,"end_column":11,"start_byte":130,"end_byte":136},"context":"other"}
+{"record":"reference","name":"Node","scope":"_ready","range":{"start_row":7,"start_column":19,"end_row":7,"end_column":23,"start_byte":144,"end_byte":148},"name_range":{"start_row":7,"start_column":19,"end_row":7,"end_column":23,"start_byte":144,"end_byte":148},"context":"other"}
 "#####;
         assert_eq!(index_to_string(source), expected);
     }
@@ -238,5 +302,46 @@ var health := 5  # trailing
         assert_eq!(range.start_byte, 0);
         assert_eq!(range.end_byte, 15);
         assert_eq!(&source[range.start_byte..range.end_byte], "var health := 5");
+    }
+
+    /// A run reports res:// paths or file system paths, never a mixture. These
+    /// are the cases that would mix them, and each one has to name its fix
+    /// rather than fall back quietly.
+    #[test]
+    fn test_a_run_refuses_to_mix_path_forms() {
+        let temporary_directory = std::env::temp_dir().join(format!(
+            "gdscript-formatter-index-roots-{}",
+            std::process::id()
+        ));
+        let first_project = temporary_directory.join("first");
+        let second_project = temporary_directory.join("second");
+        let loose_directory = temporary_directory.join("loose");
+        for directory in [&first_project, &second_project, &loose_directory] {
+            std::fs::create_dir_all(directory).unwrap();
+        }
+        std::fs::write(first_project.join("project.godot"), "config_version=5\n").unwrap();
+        std::fs::write(second_project.join("project.godot"), "config_version=5\n").unwrap();
+        let first_script = first_project.join("a.gd");
+        let second_script = second_project.join("b.gd");
+        let loose_script = loose_directory.join("c.gd");
+        for script in [&first_script, &second_script, &loose_script] {
+            std::fs::write(script, "var value := 1\n").unwrap();
+        }
+
+        let one_project: Vec<PathBuf> = vec![first_script.clone()];
+        assert!(resolve_project_root(&one_project, None).unwrap().is_some());
+
+        let no_project: Vec<PathBuf> = vec![loose_script.clone()];
+        assert!(resolve_project_root(&no_project, None).unwrap().is_none());
+
+        let two_projects: Vec<PathBuf> = vec![first_script.clone(), second_script];
+        let error = resolve_project_root(&two_projects, None).unwrap_err();
+        assert!(error.contains("--project-root"), "{}", error);
+
+        let mixed: Vec<PathBuf> = vec![first_script, loose_script];
+        let error = resolve_project_root(&mixed, None).unwrap_err();
+        assert!(error.contains("mix res:// paths"), "{}", error);
+
+        std::fs::remove_dir_all(temporary_directory).unwrap();
     }
 }

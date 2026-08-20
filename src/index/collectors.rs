@@ -114,6 +114,69 @@ pub fn write_scope_field(scope: &str, output: &mut String) {
     json_push_string_field("scope", scope, output);
 }
 
+/// Where an expression sits in the argument list that encloses it.
+pub struct ArgumentPosition<'a> {
+    /// The name of the thing being called, when it is a plain name.
+    pub callee: Option<&'a str>,
+    pub index: usize,
+}
+
+/// Returns the argument list position of `node`, or None when it is not an
+/// argument.
+///
+/// Callers pass the outermost node of the expression: for a call, the call node
+/// rather than its callee, since that is the node the argument list holds.
+pub fn find_argument_position<'a>(node: &Node, source: &'a str) -> Option<ArgumentPosition<'a>> {
+    let parent = node.parent()?;
+    if GDScriptNodeKind::get_kind_from_ast_node(parent) != GDScriptNodeKind::Arguments {
+        return None;
+    }
+
+    let mut argument_index = 0;
+    let mut found_index = None;
+    for child_index in 0..parent.named_child_count() {
+        let Some(child) = parent.named_child(child_index as u32) else {
+            continue;
+        };
+        if GDScriptNodeKind::get_kind_from_ast_node(child) == GDScriptNodeKind::Comment {
+            continue;
+        }
+        if child.id() == node.id() {
+            found_index = Some(argument_index);
+            break;
+        }
+        argument_index += 1;
+    }
+    let index = found_index?;
+
+    let callee_owner = parent.parent()?;
+    let callee_owner_kind = GDScriptNodeKind::get_kind_from_ast_node(callee_owner);
+    let mut callee = None;
+    if matches!(
+        callee_owner_kind,
+        GDScriptNodeKind::Call | GDScriptNodeKind::AttributeCall | GDScriptNodeKind::Annotation
+    ) && let Some(first_child) = callee_owner.named_child(0)
+        && GDScriptNodeKind::get_kind_from_ast_node(first_child) == GDScriptNodeKind::Identifier
+    {
+        callee = Some(get_node_text(&first_child, source));
+    }
+
+    Some(ArgumentPosition { callee, index })
+}
+
+pub fn write_argument_of_field(argument_position: &ArgumentPosition, output: &mut String) {
+    json_push_field_name("argument_of", output);
+    output.push('{');
+    if let Some(callee) = argument_position.callee {
+        output.push_str("\"callee\":");
+        json_push_escaped_string(callee, output);
+        output.push(',');
+    }
+    output.push_str("\"index\":");
+    output.push_str(&argument_position.index.to_string());
+    output.push('}');
+}
+
 /// Returns true when `node` is the named field `field_name` of `parent`.
 pub fn is_field_of(parent: &Node, field_name: &str, node: &Node) -> bool {
     match parent.child_by_field_name(field_name) {
@@ -139,12 +202,26 @@ pub fn find_first_named_child_of_kind<'tree>(
 ///
 /// `statement` is the value that unlocks new checks on the consumer side: an
 /// expression whose context is `statement` and which is not a call does nothing
-/// at runtime.
-pub fn find_expression_context(node: &Node) -> &'static str {
+/// at runtime. `condition` unlocks another: a method named but not called in a
+/// truth test is a `Callable`, which is always true, so the branch never varies.
+pub fn find_expression_context(node: &Node, source: &str) -> &'static str {
     let Some(parent) = node.parent() else {
         return "other";
     };
     let parent_kind = GDScriptNodeKind::get_kind_from_ast_node(parent);
+
+    // Parentheses do not change what an expression is doing, only how it is
+    // written, so the context is whatever the parenthesized expression's is.
+    if parent_kind == GDScriptNodeKind::ParenthesizedExpression {
+        return find_expression_context(&parent, source);
+    }
+
+    // A value that feeds a boolean operator is tested for truth just as much as
+    // the condition of an `if` is, and `if flag and self.predicate:` is exactly
+    // where the uncalled-method bug hides.
+    if is_truth_tested_by(&parent, parent_kind, source) {
+        return "condition";
+    }
 
     if parent_kind == GDScriptNodeKind::Arguments {
         return "argument";
@@ -186,6 +263,30 @@ pub fn find_expression_context(node: &Node) -> &'static str {
     }
 
     "other"
+}
+
+/// True when `parent` evaluates its operands for their truthiness.
+///
+/// The keyword forms and the symbol forms are both accepted. The `not` of
+/// `is not` and `not in` is part of a comparison rather than a unary operator,
+/// so it does not reach here: those spell their operator in the `op` fields of a
+/// binary operator, and neither reads as `and` or `or`.
+fn is_truth_tested_by(parent: &Node, parent_kind: GDScriptNodeKind, source: &str) -> bool {
+    if parent_kind == GDScriptNodeKind::BinaryOperator {
+        let Some(operator_node) = parent.child_by_field_name("op") else {
+            return false;
+        };
+        let operator = get_node_text(&operator_node, source);
+        return matches!(operator, "and" | "or" | "&&" | "||");
+    }
+    if parent_kind == GDScriptNodeKind::UnaryOperator {
+        let Some(operator_node) = parent.child(0) else {
+            return false;
+        };
+        let operator = get_node_text(&operator_node, source);
+        return matches!(operator, "not" | "!");
+    }
+    false
 }
 
 /// True when the node sits in a type position, such as `Label` in

@@ -115,10 +115,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
 
-    if matches!(parsed_cli_args.command, Command::Index) {
+    if let Command::Index { project_root } = &parsed_cli_args.command {
         return run_index(
             &parsed_cli_args.input_file_paths,
             &parsed_cli_args.excluded_paths,
+            project_root.as_deref(),
         );
     }
 
@@ -369,6 +370,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 fn run_index(
     input_file_paths: &[PathBuf],
     excluded_paths: &[PathBuf],
+    project_root: Option<&Path>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     if input_file_paths.is_empty() && !io::stdin().is_terminal() {
         let mut input_content = String::new();
@@ -397,7 +399,19 @@ fn run_index(
     };
     let input_gdscript_files = find_gdscript_files(&input_paths, excluded_paths)?;
 
-    let had_parse_errors = gdscript_formatter::index::index_gdscript_files(&input_gdscript_files)?;
+    // The two failures mean different things to a consumer and get different
+    // codes: exit 2 means some files did not parse but the rest still produced
+    // records, exit 1 means the run produced no usable index at all.
+    let had_parse_errors = match gdscript_formatter::index::index_gdscript_files(
+        &input_gdscript_files,
+        project_root,
+    ) {
+        Ok(had_parse_errors) => had_parse_errors,
+        Err(error) => {
+            eprintln!("gdscript-formatter: error: {}", error);
+            std::process::exit(1);
+        }
+    };
     if had_parse_errors {
         std::process::exit(FormatterExitCodes::ParseErrors as i32);
     }

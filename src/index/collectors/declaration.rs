@@ -476,7 +476,17 @@ fn write_declaration_record(record: &DeclarationRecord, scope: &str, output: &mu
         output.push(']');
     }
 
-    if let Some(body_range) = record.body_range {
+    // A function always reports `body_range`, null when it has no body. Every
+    // other absent field means empty; this one has to separate "no body" from
+    // "not a function", and a consumer cannot read that off an absence.
+    if record.kind == "function" {
+        if let Some(body_range) = record.body_range {
+            json_push_range_field("body_range", &body_range, output);
+        } else {
+            json_push_field_name("body_range", output);
+            output.push_str("null");
+        }
+    } else if let Some(body_range) = record.body_range {
         json_push_range_field("body_range", &body_range, output);
     }
     if record.body_is_pass_only {

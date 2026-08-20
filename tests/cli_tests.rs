@@ -163,6 +163,35 @@ fn index_reports_project_relative_paths_and_fails_on_parse_errors() {
         String::from_utf8(stdin_output.stdout).expect("index output should be valid UTF-8");
     assert!(stdin_lines.starts_with("{\"record\":\"file\",\"schema\":1,\"path\":\"<stdin>\"}\n"));
 
+    // An explicit root wins over discovery, which is the escape hatch for
+    // layouts where walking up finds the wrong thing or nothing at all.
+    let explicit_root_output =
+        formatter_command(&directory, &["index", "--project-root", ".", "hud/hud.gd"])
+            .output()
+            .expect("should index with an explicit project root");
+    assert!(explicit_root_output.status.success());
+    assert!(
+        String::from_utf8(explicit_root_output.stdout)
+            .expect("index output should be valid UTF-8")
+            .contains("\"path\":\"res://hud/hud.gd\"")
+    );
+
+    // A file outside the root has no res:// path. Reporting it as a file system
+    // path would mix the two forms in one run, and a consumer joining on
+    // res:// paths would silently match nothing.
+    let outside_root_output = formatter_command(
+        &directory,
+        &["index", "--project-root", "hud", "skipped.gd"],
+    )
+    .output()
+    .expect("should reject a file outside the project root");
+    assert!(!outside_root_output.status.success());
+    assert!(
+        String::from_utf8(outside_root_output.stderr)
+            .expect("stderr should be valid UTF-8")
+            .contains("outside the project root")
+    );
+
     // A file that does not parse still gets a header, and the run fails so a
     // consumer cannot mistake a broken project for a clean one.
     fs::write(directory.join("broken.gd"), "func (:\n").expect("should write a broken file");
