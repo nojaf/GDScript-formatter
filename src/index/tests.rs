@@ -32,7 +32,7 @@ func _process(_delta: float) -> void:
 	self.call("late_bound")
 "#####;
         let expected = r#####"{"record":"file","schema":1,"path":"res://test.gd","extends":"CanvasLayer"}
-{"record":"declaration","kind":"class","name":"Hud","scope":"","range":{"start_row":1,"start_column":1,"end_row":1,"end_column":15,"start_byte":0,"end_byte":14},"name_range":{"start_row":1,"start_column":12,"end_row":1,"end_column":15,"start_byte":11,"end_byte":14},"extends":"CanvasLayer"}
+{"record":"declaration","kind":"class","name":"Hud","scope":"","range":{"start_row":1,"start_column":1,"end_row":1,"end_column":15,"start_byte":0,"end_byte":14},"name_range":{"start_row":1,"start_column":12,"end_row":1,"end_column":15,"start_byte":11,"end_byte":14},"extends":"CanvasLayer","is_file_class":true}
 {"record":"reference","name":"CanvasLayer","scope":"","range":{"start_row":2,"start_column":9,"end_row":2,"end_column":20,"start_byte":23,"end_byte":34},"name_range":{"start_row":2,"start_column":9,"end_row":2,"end_column":20,"start_byte":23,"end_byte":34},"context":"type"}
 {"record":"declaration","kind":"variable","name":"clock","scope":"","range":{"start_row":4,"start_column":1,"end_row":4,"end_column":35,"start_byte":36,"end_byte":70},"name_range":{"start_row":4,"start_column":14,"end_row":4,"end_column":19,"start_byte":49,"end_byte":54},"type":"Label","default":"$Clock","annotations":[{"name":"onready","range":{"start_row":4,"start_column":1,"end_row":4,"end_column":9,"start_byte":36,"end_byte":44}}]}
 {"record":"reference","name":"Label","scope":"","range":{"start_row":4,"start_column":21,"end_row":4,"end_column":26,"start_byte":56,"end_byte":61},"name_range":{"start_row":4,"start_column":21,"end_row":4,"end_column":26,"start_byte":56,"end_byte":61},"context":"type"}
@@ -267,6 +267,62 @@ func _ready() -> void:
 {"record":"string_literal","value":"res://base/thing.gd","scope":"","range":{"start_row":1,"start_column":9,"end_row":1,"end_column":30,"start_byte":8,"end_byte":29}}
 {"record":"declaration","kind":"function","name":"_ready","scope":"","range":{"start_row":3,"start_column":1,"end_row":4,"end_column":6,"start_byte":31,"end_byte":59},"name_range":{"start_row":3,"start_column":6,"end_row":3,"end_column":12,"start_byte":36,"end_byte":42},"type":"void","body_range":{"start_row":3,"start_column":23,"end_row":4,"end_column":6,"start_byte":53,"end_byte":59},"body_is_pass_only":true}
 {"record":"reference","name":"void","scope":"_ready","range":{"start_row":3,"start_column":18,"end_row":3,"end_column":22,"start_byte":48,"end_byte":52},"name_range":{"start_row":3,"start_column":18,"end_row":3,"end_column":22,"start_byte":48,"end_byte":52},"context":"type"}
+"#####;
+        assert_eq!(index_to_string(source), expected);
+    }
+
+    /// A file's own `class_name` and an inner class both report `kind: "class"`
+    /// at file scope. Without `is_file_class` nothing on the record separates
+    /// them, and position does not: the first class in a file is the file's own
+    /// only when the file has a `class_name` at all.
+    #[test]
+    fn test_the_file_class_says_so_and_inner_classes_do_not() {
+        let source = r#####"class_name Hud
+extends CanvasLayer
+
+class Helper extends RefCounted:
+	var n: int = 0
+
+class Plain:
+	var m := 0
+"#####;
+        let expected = r#####"{"record":"file","schema":1,"path":"res://test.gd","extends":"CanvasLayer"}
+{"record":"declaration","kind":"class","name":"Hud","scope":"","range":{"start_row":1,"start_column":1,"end_row":1,"end_column":15,"start_byte":0,"end_byte":14},"name_range":{"start_row":1,"start_column":12,"end_row":1,"end_column":15,"start_byte":11,"end_byte":14},"extends":"CanvasLayer","is_file_class":true}
+{"record":"reference","name":"CanvasLayer","scope":"","range":{"start_row":2,"start_column":9,"end_row":2,"end_column":20,"start_byte":23,"end_byte":34},"name_range":{"start_row":2,"start_column":9,"end_row":2,"end_column":20,"start_byte":23,"end_byte":34},"context":"type"}
+{"record":"declaration","kind":"class","name":"Helper","scope":"","range":{"start_row":4,"start_column":1,"end_row":5,"end_column":16,"start_byte":36,"end_byte":84},"name_range":{"start_row":4,"start_column":7,"end_row":4,"end_column":13,"start_byte":42,"end_byte":48},"extends":"RefCounted"}
+{"record":"reference","name":"RefCounted","scope":"Helper","range":{"start_row":4,"start_column":22,"end_row":4,"end_column":32,"start_byte":57,"end_byte":67},"name_range":{"start_row":4,"start_column":22,"end_row":4,"end_column":32,"start_byte":57,"end_byte":67},"context":"type"}
+{"record":"declaration","kind":"variable","name":"n","scope":"Helper","range":{"start_row":5,"start_column":2,"end_row":5,"end_column":16,"start_byte":70,"end_byte":84},"name_range":{"start_row":5,"start_column":6,"end_row":5,"end_column":7,"start_byte":74,"end_byte":75},"type":"int","default":"0"}
+{"record":"reference","name":"int","scope":"Helper","range":{"start_row":5,"start_column":9,"end_row":5,"end_column":12,"start_byte":77,"end_byte":80},"name_range":{"start_row":5,"start_column":9,"end_row":5,"end_column":12,"start_byte":77,"end_byte":80},"context":"type"}
+{"record":"declaration","kind":"class","name":"Plain","scope":"","range":{"start_row":7,"start_column":1,"end_row":8,"end_column":12,"start_byte":86,"end_byte":110},"name_range":{"start_row":7,"start_column":7,"end_row":7,"end_column":12,"start_byte":92,"end_byte":97}}
+{"record":"declaration","kind":"variable","name":"m","scope":"Plain","range":{"start_row":8,"start_column":2,"end_row":8,"end_column":12,"start_byte":100,"end_byte":110},"name_range":{"start_row":8,"start_column":6,"end_row":8,"end_column":7,"start_byte":104,"end_byte":105},"default":"0"}
+"#####;
+        assert_eq!(index_to_string(source), expected);
+    }
+
+    /// A file with no `class_name` has no file class, so no record claims to be
+    /// one, and the inner classes keep their own bases: `Plain` extends nothing
+    /// written, not the file's `Node`, and `Owned` extends what its body says.
+    /// Handing an inner class the file's base is a wrong answer rather than a
+    /// missing one, and the consumer would check members against a class the
+    /// code never inherits from.
+    #[test]
+    fn test_inner_classes_do_not_inherit_the_file_extends() {
+        let source = r#####"extends Node
+
+class Plain:
+	var m := 0
+
+class Owned:
+	extends RefCounted
+	var n := 0
+"#####;
+        let expected = r#####"{"record":"file","schema":1,"path":"res://test.gd","extends":"Node"}
+{"record":"reference","name":"Node","scope":"","range":{"start_row":1,"start_column":9,"end_row":1,"end_column":13,"start_byte":8,"end_byte":12},"name_range":{"start_row":1,"start_column":9,"end_row":1,"end_column":13,"start_byte":8,"end_byte":12},"context":"type"}
+{"record":"declaration","kind":"class","name":"Plain","scope":"","range":{"start_row":3,"start_column":1,"end_row":4,"end_column":12,"start_byte":14,"end_byte":38},"name_range":{"start_row":3,"start_column":7,"end_row":3,"end_column":12,"start_byte":20,"end_byte":25}}
+{"record":"declaration","kind":"variable","name":"m","scope":"Plain","range":{"start_row":4,"start_column":2,"end_row":4,"end_column":12,"start_byte":28,"end_byte":38},"name_range":{"start_row":4,"start_column":6,"end_row":4,"end_column":7,"start_byte":32,"end_byte":33},"default":"0"}
+{"record":"declaration","kind":"class","name":"Owned","scope":"","range":{"start_row":6,"start_column":1,"end_row":8,"end_column":12,"start_byte":40,"end_byte":84},"name_range":{"start_row":6,"start_column":7,"end_row":6,"end_column":12,"start_byte":46,"end_byte":51},"extends":"RefCounted"}
+{"record":"reference","name":"RefCounted","scope":"Owned","range":{"start_row":7,"start_column":10,"end_row":7,"end_column":20,"start_byte":62,"end_byte":72},"name_range":{"start_row":7,"start_column":10,"end_row":7,"end_column":20,"start_byte":62,"end_byte":72},"context":"type"}
+{"record":"declaration","kind":"variable","name":"n","scope":"Owned","range":{"start_row":8,"start_column":2,"end_row":8,"end_column":12,"start_byte":74,"end_byte":84},"name_range":{"start_row":8,"start_column":6,"end_row":8,"end_column":7,"start_byte":78,"end_byte":79},"default":"0"}
 "#####;
         assert_eq!(index_to_string(source), expected);
     }

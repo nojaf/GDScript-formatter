@@ -15,6 +15,7 @@ This file documents the changes made to the formatter with each release.
 - `index`: documented when the JSON Lines `schema` is bumped, and recorded every record-shape change made so far under schema 1. The number stays at 1 while this sub-command and its one consumer are developed and updated together; `docs/specification_index.md` names the conditions that end that
 - `index`: constructors are now indexed. `_init` is an anonymous keyword in the grammar, so the name lookup never found it and every constructor was missing from the output
 - `index`: annotations written on the line above a declaration now bind to it, so an own-line `@abstract` reports `modifiers: ["abstract"]` like the same-line form always did. Previously they were dropped. Annotations that belong to no declaration, such as `@tool` above a bare `extends`, are emitted as their own `annotation` record
+- `index`: the `class` declaration for a file's own `class_name` reports `"is_file_class": true`, so a consumer can tell it from an inner class without guessing from position. Both are `kind: "class"` at file scope, and the first class in a file is the file's own only when the file has a `class_name` at all
 - `index`: `context` reports `condition` for every expression tested for truth, including both operands of `and` and `or` and the operand of `not`, so a method named but never called in `if flag and self.predicate:` is now distinguishable from an ordinary expression. Parentheses no longer change any context
 
 ### Changed
@@ -26,6 +27,7 @@ This file documents the changes made to the formatter with each release.
 
 ### Fixed
 
+- `index`: an inner class no longer reports the enclosing file's `extends` as its own base. `class Helper:` inside a file that says `extends Node` reported `Node`, and an inner class with its own `extends` on a later line reported `Node` too, so a consumer checked its members against a class it never inherits from
 - Fixed an extra comma being inserted after a trailing comment in a lambda function argument (#304)
 - fixed certain export annotations being moved out of their respective groups (#308)
 - Preserve up to one blank line used to group elements in "containers" like enums

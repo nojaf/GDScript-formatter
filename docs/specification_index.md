@@ -206,6 +206,7 @@ This is what makes per-scope shadowing and inner classes work.
 | `body_range` | functions only, a range or an explicit `null` when there is no body |
 | `body_is_pass_only` | functions only |
 | `extends` | classes only: the base as written, a class name or a `"res://path.gd"` string |
+| `is_file_class` | classes only: `true` on the file's own `class_name`, absent on inner classes |
 
 `annotations` and `modifiers` are the fields that fix the `@abstract` class of
 bug. The consumer never has to recognise annotation syntax again. They cover both
@@ -217,6 +218,18 @@ second as a sibling, and both apply in Godot, so both land on the record.
 `extends` is on the class record and on the `file` header, and reads the same in
 both. `class_name Foo extends Bar` and `class_name Foo` above `extends Bar` mean
 the same thing and report the same thing.
+
+An inner class reports its own base or none at all. It never inherits the file's:
+`class Helper:` inside a file that says `extends Node` reports no `extends`,
+because nothing was written and the implicit base is `RefCounted` rather than
+`Node`.
+
+`is_file_class` separates the file's own class from an inner class, which
+otherwise look alike: both are `kind: "class"` at file scope. Exactly one record
+per file carries it, and a file with no `class_name` has none, so absent means
+"an inner class, or a file that declares no class" rather than "unknown".
+Position cannot stand in for it, because the first class in a file is the file's
+own only when the file has a `class_name` at all.
 
 ### `reference`
 
@@ -458,6 +471,8 @@ of guessed at.
 | `argument_of` on `reference` and `member_chain`. `extends` on `class` declarations and the `file` header. New `annotation` record. | no |
 | `context` reports `condition` for operands of `and`, `or` and `not`, and reads through parentheses. | values |
 | Constructors and own-line annotations are reported at all, having been dropped. | no, but output grows |
+| `is_file_class` on the file's own `class` declaration. | no |
+| An inner class reports its own `extends` or none, having reported the file's. | no, but a wrong value becomes right |
 
 The exact-output tests in `src/index/tests.rs` fail on any change to any record,
 which is the moment to add a row here and ask whether the change needs a bump. A
@@ -917,3 +932,102 @@ process point stands regardless of this instance being harmless.
 > longer lets a shape change go unrecorded. Neither test can tell whether a change
 > is breaking. That judgment stays with whoever makes it, which is worth saying
 > plainly rather than pretending the tests decide.
+
+### 9. Say which `class` record is the file's own `class_name`
+
+Requirement 7 was filed to retire the consumer's last two text scans, for
+`class_name` and for `extends`. It settled `extends` and left the other half.
+
+A file's `class_name` and an inner class both arrive as `kind: "class"` with
+`scope: ""`, and nothing on the record separates them:
+
+```gdscript
+class_name Hud
+extends CanvasLayer
+
+class Helper extends RefCounted:
+	var n: int = 0
+```
+
+```jsonl
+{"record": "declaration", "kind": "class", "name": "Hud",    "scope": "", "extends": "CanvasLayer"}
+{"record": "declaration", "kind": "class", "name": "Helper", "scope": "", "extends": "RefCounted"}
+```
+
+Position does not decide it either. Godot requires `class_name` above everything
+but annotations and `extends`, so the file's own class is always the first of
+these, but a file with inner classes and no `class_name` then hands back an inner
+class in answer to "what does this file declare". Range does not decide it: an
+inner class body usually spans rows, but `class OneLine: pass` is a single row,
+the same shape as a `class_name` line.
+
+Add one field to the `class` declaration record, or use a distinct `kind`. Either
+reads the same to a consumer. A boolean is enough:
+
+```jsonl
+{"record": "declaration", "kind": "class", "name": "Hud", "is_file_class": true, ...}
+```
+
+Absent means false, per requirement 3, so only the one record per file gains a
+field and nothing else changes shape.
+
+**How the consumer works without it, and why this is still worth doing.** The
+name now comes from `ProjectSettings.get_global_class_list()`, which the engine
+keeps whether or not a script compiles, so no text scan came back. That source
+has a gap the index does not: it is built at import, so a `class_name` added
+since the last `--import` is missing from it, and the consumer's fold of
+cascading load failures degrades to reporting each failure separately. Noisier,
+never wrong. The index reads the file as it is on disk and would close that gap.
+
+Not urgent. Nothing is blocked, and the current answer is good enough for a
+project that is imported before it is linted.
+
+> **Done.** The file's own class reports `"is_file_class": true`. Absent means
+> false, so exactly one record per file gains a field and nothing else changes
+> shape.
+>
+> A boolean rather than a distinct `kind`, as offered. A consumer that only wants
+> "what does this file declare" reads one field; one that walks every class still
+> matches a single `kind`, and no existing branch on `kind: "class"` has to learn
+> a second spelling.
+>
+> The node kind decides it, not position: `class_name Foo` is a
+> `class_name_statement` in the grammar and an inner class is a
+> `class_definition`. So a file with inner classes and no `class_name` marks
+> none of them, which is the answer the requirement asks for, and the one-row
+> `class OneLine: pass` case never comes up.
+
+## Found while implementing requirement 9
+
+**An inner class was reported as extending whatever the file extends.** This:
+
+```gdscript
+extends Node
+
+class Helper:
+	var n := 0
+```
+
+reported `Helper` as `"extends": "Node"`. It extends nothing written, so its base
+is `RefCounted`. An inner class that wrote its own base on a later line, as
+`class Helper:` above an indented `extends RefCounted`, was also reported as
+`Node`.
+
+Requirement 7 shipped `extends` by reading the class declaration's own `extends`
+field and, failing that, searching the parent for an `extends` statement. That
+second half is right for `class_name Foo` above `extends Bar`, where the file's
+`extends` really is a sibling of the `class_name` statement. For an inner class
+the parent is the file, so the search walked out of the class and found the
+file's.
+
+Each of the two now looks where its own `extends` can be: a sibling for the
+`class_name` statement, the class body for an inner class. This is the failure
+mode that requirement 9 is about in a different place, and the reason the two are
+in one change: nothing on the record said which class it was, and the code
+telling them apart did not either.
+
+Worse than a missing field, because the consumer checks members against the base
+it is given, so an inner class was checked against the outer script's base class.
+Every member of `Node` looked available on a plain `RefCounted` helper, and any
+call the helper's real base does not have looked fine. In the fixture corpus:
+19 inner classes, 1 of them given the file's base.

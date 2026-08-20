@@ -70,6 +70,9 @@ pub struct DeclarationRecord<'a> {
     pub body_is_pass_only: bool,
     /// Classes only: what the class extends, as written.
     pub extends: Option<&'a str>,
+    /// True on the one class record per file that is the file's own
+    /// `class_name`, false on inner classes.
+    pub is_file_class: bool,
 }
 
 impl<'a> DeclarationRecord<'a> {
@@ -88,6 +91,7 @@ impl<'a> DeclarationRecord<'a> {
             body_range: None,
             body_is_pass_only: false,
             extends: None,
+            is_file_class: false,
         }
     }
 }
@@ -126,7 +130,7 @@ pub fn collect(node: &Node, context: &CollectorContext, output: &mut String) {
     match node_kind {
         GDScriptNodeKind::ClassName
         | GDScriptNodeKind::ClassDefinition
-        | GDScriptNodeKind::InnerClass => collect_class(node, context, output),
+        | GDScriptNodeKind::InnerClass => collect_class(node, node_kind, context, output),
         GDScriptNodeKind::Variable
         | GDScriptNodeKind::ExportVariable
         | GDScriptNodeKind::OnReadyVariable => collect_variable(node, "variable", context, output),
@@ -143,7 +147,17 @@ pub fn collect(node: &Node, context: &CollectorContext, output: &mut String) {
     }
 }
 
-fn collect_class(node: &Node, context: &CollectorContext, output: &mut String) {
+/// A `class_name` statement and an inner class both report `kind: "class"` at
+/// file scope, and nothing else on the record separates them. Position does not
+/// decide it either: a file with inner classes and no `class_name` would hand
+/// back an inner class in answer to "what does this file declare". The node kind
+/// does, so the record says it outright.
+fn collect_class(
+    node: &Node,
+    node_kind: GDScriptNodeKind,
+    context: &CollectorContext,
+    output: &mut String,
+) {
     let Some(name_node) = node.child_by_field_name("name") else {
         return;
     };
@@ -155,7 +169,8 @@ fn collect_class(node: &Node, context: &CollectorContext, output: &mut String) {
     );
     collect_annotations(node, context.source, &mut record.annotations);
     record.range = get_declaration_range(node, &record.annotations);
-    record.extends = find_extends_for_class(node, context.source);
+    record.extends = find_extends_for_class(node, node_kind, context.source);
+    record.is_file_class = node_kind == GDScriptNodeKind::ClassName;
     write_declaration_record(&record, context.scope, output);
 }
 
@@ -481,21 +496,31 @@ pub fn read_extends_text<'a>(extends_statement: &Node, source: &'a str) -> Optio
 
 /// Finds the `extends` that applies to a class declaration.
 ///
-/// `class_name Foo extends Bar` nests the extends inside the class_name
-/// statement, while `class_name Foo` on one line and `extends Bar` on the next
-/// leaves it as a sibling. Both mean the same thing.
-fn find_extends_for_class<'a>(node: &Node, source: &'a str) -> Option<&'a str> {
+/// Written on the class line, `class_name Foo extends Bar` or
+/// `class Inner extends Bar:`, the grammar nests it in the declaration and
+/// there is nothing to search for.
+///
+/// Written on its own line it lands somewhere different for each of the two,
+/// and where it is decides whose base it is. The file's `extends` is a sibling
+/// of the `class_name` statement, and an inner class's is a statement in that
+/// class's body. Looking in the wrong one of those hands an inner class the
+/// file's base, which is a wrong answer rather than a missing one: the consumer
+/// would check members against a class the code never inherits from.
+fn find_extends_for_class<'a>(
+    node: &Node,
+    node_kind: GDScriptNodeKind,
+    source: &'a str,
+) -> Option<&'a str> {
     if let Some(extends_statement) = node.child_by_field_name("extends") {
         return read_extends_text(&extends_statement, source);
     }
-    let parent = node.parent()?;
-    for child_index in 0..parent.named_child_count() {
-        let child = parent.named_child(child_index as u32)?;
-        if GDScriptNodeKind::get_kind_from_ast_node(child) == GDScriptNodeKind::Extends {
-            return read_extends_text(&child, source);
-        }
-    }
-    None
+    let container = if node_kind == GDScriptNodeKind::ClassName {
+        node.parent()?
+    } else {
+        node.child_by_field_name("body")?
+    };
+    let extends_statement = find_first_named_child_of_kind(&container, GDScriptNodeKind::Extends)?;
+    read_extends_text(&extends_statement, source)
 }
 
 fn has_annotation_named(annotations: &[AnnotationRecord], name: &str) -> bool {
@@ -566,6 +591,9 @@ fn write_declaration_record(record: &DeclarationRecord, scope: &str, output: &mu
     }
     if let Some(extends) = record.extends {
         json_push_string_field("extends", extends, output);
+    }
+    if record.is_file_class {
+        json_push_bool_field("is_file_class", true, output);
     }
 
     write_annotations_field(&record.annotations, output);
