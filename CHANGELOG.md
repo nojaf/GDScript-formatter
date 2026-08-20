@@ -11,6 +11,9 @@ This file documents the changes made to the formatter with each release.
 - `index`: every member chain segment now reports its `kind` (`identifier`, `self`, `call`, `node_path`, `subscript`, `other`) and whether it is a call, so a consumer resolving a chain hop by hop knows where to stop instead of mistaking `$Clock.text` for a member of the enclosing script
 - `index`: added `--project-root <PATH>`, and a run now refuses to mix `res://` paths with file system paths rather than silently producing paths a consumer cannot join on
 - `index`: `reference` and `member_chain` records carry `argument_of`, so nested calls report their argument position without re-parsing argument text
+- `index`: `class` declarations and the `file` header report `extends`, the base as written, so a consumer can work out which script a compile failure really came from without scanning the source itself
+- `index`: constructors are now indexed. `_init` is an anonymous keyword in the grammar, so the name lookup never found it and every constructor was missing from the output
+- `index`: annotations written on the line above a declaration now bind to it, so an own-line `@abstract` reports `modifiers: ["abstract"]` like the same-line form always did. Previously they were dropped. Annotations that belong to no declaration, such as `@tool` above a bare `extends`, are emitted as their own `annotation` record
 - `index`: `context` reports `condition` for every expression tested for truth, including both operands of `and` and `or` and the operand of `not`, so a method named but never called in `if flag and self.predicate:` is now distinguishable from an ordinary expression. Parentheses no longer change any context
 
 ### Changed

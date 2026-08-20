@@ -111,10 +111,18 @@ for `JSON.parse_string` in GDScript.
 Each file produces a header record followed by its content records:
 
 ```jsonl
-{"record": "file", "schema": 1, "path": "res://hud/hud.gd"}
+{"record": "file", "schema": 1, "path": "res://hud/hud.gd", "extends": "CanvasLayer"}
 {"record": "declaration", ...}
 {"record": "member_chain", ...}
 ```
+
+The header carries `extends`, what the file's own script extends, as written: a
+class name or a `"res://path.gd"` string with its quotes. It sits here as well as
+on the `class` declaration because most scripts have no `class_name`, and a
+consumer working out which script broke first needs the base of every script
+rather than only of the named ones. Absent when the file extends nothing.
+
+Annotations that no declaration claims get their own record, described below.
 
 ### Absent means empty, never unknown
 
@@ -195,11 +203,20 @@ This is what makes per-scope shadowing and inner classes work.
 | `parameters` | functions only: array of `{"name", "type", "default", "range"}` |
 | `type` | declared type as written, or `null` |
 | `default` | default value source text, or `null` |
-| `body_range` | functions only, or `null` for an abstract declaration with no body |
+| `body_range` | functions only, a range or an explicit `null` when there is no body |
 | `body_is_pass_only` | functions only |
+| `extends` | classes only: the base as written, a class name or a `"res://path.gd"` string |
 
 `annotations` and `modifiers` are the fields that fix the `@abstract` class of
-bug. The consumer never has to recognise annotation syntax again.
+bug. The consumer never has to recognise annotation syntax again. They cover both
+spellings: an annotation written on the same line as the declaration and one
+written on the line above it. The grammar attaches the first and leaves the
+second as a sibling, and both apply in Godot, so both land on the record.
+`range` covers them either way.
+
+`extends` is on the class record and on the `file` header, and reads the same in
+both. `class_name Foo extends Bar` and `class_name Foo` above `extends Bar` mean
+the same thing and report the same thing.
 
 ### `reference`
 
@@ -292,6 +309,22 @@ the consumer re-parse the `arguments` text of the level above it.
 Emitted for every comparison, not only those against `null`. The existing
 `comparison-with-itself` lint rule wants the same data, so the record earns its
 place beyond one consumer.
+
+### `annotation`
+
+An annotation that belongs to no declaration.
+
+| Field | Notes |
+|-------|-------|
+| `name` | the annotation name without the `@` |
+| `arguments` | array of source text, absent when there are none |
+| `range`, `scope` | |
+
+Most annotations belong to a declaration and are reported in its `annotations`
+field. The rest have nothing to attach to: `@tool` above a bare `extends`, or
+`@warning_ignore(...)` above a statement inside a `match`. Between this record
+and the `annotations` field, every annotation in a file is reported exactly once,
+and a test over the fixture corpus holds that to be true.
 
 ### `comment`
 
@@ -500,7 +533,8 @@ resolves a name to a parameter rather than to a member that shares it.
 
 **`_init` has no name in the grammar.** It is a keyword, so the constructor is
 emitted as a `function` named `_init` with the keyword's range as its
-`name_range`.
+`name_range`. This paragraph described the intent for a while before it described
+the behaviour; see "What the corpus audit found" below.
 
 **Types are references.** "Emit every identifier" was meant to keep resolution
 possible, and type positions are identifiers. They are emitted with
@@ -718,3 +752,84 @@ when it matters.
 
 Until this lands the consumer keeps a small text scan for `class_name` and
 `extends`, used only on scripts that failed to load.
+
+> **Done.** `extends` is on the `class` declaration, holding the base as written:
+> `Bar`, `Qux.Inner`, or `"res://path.gd"` with its quotes, since every other
+> source-text field keeps what was written and the `string_literal` record for
+> that same string already carries the path with escapes resolved.
+>
+> One addition, because the literal request would have missed the common case:
+> `extends` is also on the `file` header. A `class` declaration only exists when
+> the file has a `class_name`, and most scripts do not have one. Reading it only
+> off the class record would have left the text scan in place for the majority of
+> a project, which is the opposite of the point. Inner classes carry it too.
+>
+> The text scan can go.
+
+## Found while implementing requirement 7
+
+The list under "Behaviour to keep" says `annotations` works "both for same-line
+and own-line forms". It did not. It does now.
+
+The grammar attaches an annotation written on the same line as a declaration to
+that declaration, and leaves one written on the line above as a sibling in front
+of it. The index only read the attached ones, so this:
+
+```gdscript
+@abstract
+func may_target(candidate: Node) -> bool
+```
+
+produced a function declaration with no `annotations` and no
+`modifiers: ["abstract"]`, while the same annotation written on one line
+produced both. That is the `@abstract` bug this index was built to end, in a
+different spelling, shipped inside the fix for it.
+
+It went unnoticed because the formatter moves `@export` and `@onready` onto the
+declaration's line, so a formatted project hides the failure for the two
+annotations people look at most, and shows it for `@abstract`, `@rpc`, `@tool`
+and `@warning_ignore`.
+
+Annotations above a declaration now bind to it, comments in between included,
+and the declaration's `range` covers them. Annotations that sit above something
+that is not a declaration, which in practice means `@tool` above a bare
+`extends`, go on the `file` header instead, so nothing falls out either way.
+
+The scale of it, measured on the consumer's own project: 21 own-line
+annotations, all 21 previously missing from the index. 18 `@tool`, 2 `@abstract`
+and 1 `@icon`. The two `@abstract` are the bug this index was built to end, and
+they were being dropped by the tool that fixed them. Worth a check on the
+consumer side: any project indexed before this under-reported its annotations.
+
+## What the corpus audit found
+
+The `@abstract` annotation bug above was found by accident, while reading the
+grammar for something else. That is not a way to find bugs, so after fixing it
+the counts were checked properly: for a corpus of 157 files, the tree-sitter node
+count of each construct against the number of records the index emits for it.
+
+Two more silent drops fell out immediately.
+
+**Constructors produced no declaration at all.** `_init` is a keyword in the
+grammar, keywords are anonymous nodes, and the lookup scanned named children
+only. So every `_init` in every project was missing from the index, while the
+paragraph above claimed the opposite. A consumer asking "does this method exist"
+would find no constructor anywhere. 17 in the corpus, and this is a method that
+almost every non-trivial script has.
+
+**Annotations belonging to no declaration were dropped.** `@warning_ignore(...)`
+above a statement inside a `match` binds to nothing, and the fix for the
+own-line annotation bug only looked at the top level of a file. Annotations with
+no declaration to claim them are now records of their own, at any nesting depth,
+carrying the scope they sit in. That replaced an earlier attempt that put them on
+the `file` header, which handled `@tool` and nothing deeper.
+
+Both were invisible to every test in this repository, because a fixture only ever
+proves what someone thought to write down. `test_no_construct_is_silently_dropped_across_the_fixture_corpus`
+now runs the audit over `tests/input` on every `cargo test`. It was checked
+against both bugs by reintroducing them: each one makes it fail, with a count.
+
+What the audit does not cover: `reference`, `comparison` and `context`, which
+have no one-to-one node to count against. Those remain covered by fixtures only,
+so a silent drop there would still go unnoticed. Worth extending if a consumer
+finds something missing.

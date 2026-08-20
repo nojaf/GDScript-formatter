@@ -8,7 +8,7 @@
 use tree_sitter::Node;
 
 use crate::index::collectors::{
-    CollectorContext, find_first_named_child_of_kind, write_scope_field,
+    CollectorContext, find_first_child_of_kind, find_first_named_child_of_kind, write_scope_field,
 };
 use crate::index::{
     json_push_bool_field, json_push_escaped_string, json_push_field_name, json_push_range_field,
@@ -68,6 +68,8 @@ pub struct DeclarationRecord<'a> {
     pub default_value: Option<&'a str>,
     pub body_range: Option<SourceRange>,
     pub body_is_pass_only: bool,
+    /// Classes only: what the class extends, as written.
+    pub extends: Option<&'a str>,
 }
 
 impl<'a> DeclarationRecord<'a> {
@@ -85,8 +87,38 @@ impl<'a> DeclarationRecord<'a> {
             default_value: None,
             body_range: None,
             body_is_pass_only: false,
+            extends: None,
         }
     }
+}
+
+pub fn write_annotations_field(annotations: &[AnnotationRecord], output: &mut String) {
+    if annotations.is_empty() {
+        return;
+    }
+    json_push_field_name("annotations", output);
+    output.push('[');
+    for (annotation_index, annotation) in annotations.iter().enumerate() {
+        if annotation_index > 0 {
+            output.push(',');
+        }
+        output.push_str("{\"name\":");
+        json_push_escaped_string(annotation.name, output);
+        if !annotation.arguments.is_empty() {
+            json_push_field_name("arguments", output);
+            output.push('[');
+            for (argument_index, argument) in annotation.arguments.iter().enumerate() {
+                if argument_index > 0 {
+                    output.push(',');
+                }
+                json_push_escaped_string(argument, output);
+            }
+            output.push(']');
+        }
+        json_push_range_field("range", &annotation.range, output);
+        output.push('}');
+    }
+    output.push(']');
 }
 
 pub fn collect(node: &Node, context: &CollectorContext, output: &mut String) {
@@ -115,12 +147,15 @@ fn collect_class(node: &Node, context: &CollectorContext, output: &mut String) {
     let Some(name_node) = node.child_by_field_name("name") else {
         return;
     };
-    let record = DeclarationRecord::new(
+    let mut record = DeclarationRecord::new(
         "class",
         get_node_text(&name_node, context.source),
         get_range(node),
         get_range(&name_node),
     );
+    collect_annotations(node, context.source, &mut record.annotations);
+    record.range = get_declaration_range(node, &record.annotations);
+    record.extends = find_extends_for_class(node, context.source);
     write_declaration_record(&record, context.scope, output);
 }
 
@@ -140,6 +175,7 @@ fn collect_variable(
         get_range(&name_node),
     );
     collect_annotations(node, context.source, &mut record.annotations);
+    record.range = get_declaration_range(node, &record.annotations);
     record.is_abstract = has_annotation_named(&record.annotations, "abstract");
     record.is_static = has_static_modifier(node);
     record.declared_type = read_declared_type(node, context.source);
@@ -153,12 +189,14 @@ fn collect_enum(node: &Node, context: &CollectorContext, output: &mut String) {
     let Some(name_node) = node.child_by_field_name("name") else {
         return;
     };
-    let record = DeclarationRecord::new(
+    let mut record = DeclarationRecord::new(
         "enum",
         get_node_text(&name_node, context.source),
         get_range(node),
         get_range(&name_node),
     );
+    collect_annotations(node, context.source, &mut record.annotations);
+    record.range = get_declaration_range(node, &record.annotations);
     write_declaration_record(&record, context.scope, output);
 }
 
@@ -187,6 +225,7 @@ fn collect_signal(node: &Node, context: &CollectorContext, output: &mut String) 
         get_range(&name_node),
     );
     collect_annotations(node, context.source, &mut record.annotations);
+    record.range = get_declaration_range(node, &record.annotations);
     if let Some(parameters_node) = node.child_by_field_name("parameters") {
         collect_parameter_records(&parameters_node, context.source, &mut record.parameters);
     }
@@ -202,9 +241,9 @@ fn collect_function(
     // A constructor has no name field: `_init` is a keyword in the grammar.
     // An anonymous lambda has no name to report at all.
     let name_node = match node_kind {
-        GDScriptNodeKind::Constructor => {
-            find_first_named_child_of_kind(node, GDScriptNodeKind::NameInit)
-        }
+        // `_init` is a keyword rather than a name node, and keywords are
+        // anonymous, so this has to look past the named children.
+        GDScriptNodeKind::Constructor => find_first_child_of_kind(node, GDScriptNodeKind::NameInit),
         _ => node.child_by_field_name("name"),
     };
     let Some(name_node) = name_node else {
@@ -218,6 +257,7 @@ fn collect_function(
         get_range(&name_node),
     );
     collect_annotations(node, context.source, &mut record.annotations);
+    record.range = get_declaration_range(node, &record.annotations);
     record.is_abstract = has_annotation_named(&record.annotations, "abstract");
     record.is_static = has_static_modifier(node);
     record.declared_type = read_field_text(node, "return_type", context.source);
@@ -307,11 +347,60 @@ fn collect_parameter_records<'a>(
     }
 }
 
+/// True when a declaration of this kind takes the annotations written above it.
+///
+/// The file header claims the ones this leaves behind, so that between them no
+/// annotation is reported twice and none is dropped.
+pub fn absorbs_preceding_annotations(node_kind: GDScriptNodeKind) -> bool {
+    matches!(
+        node_kind,
+        GDScriptNodeKind::ClassName
+            | GDScriptNodeKind::ClassDefinition
+            | GDScriptNodeKind::InnerClass
+            | GDScriptNodeKind::Variable
+            | GDScriptNodeKind::ExportVariable
+            | GDScriptNodeKind::OnReadyVariable
+            | GDScriptNodeKind::Const
+            | GDScriptNodeKind::Enum
+            | GDScriptNodeKind::Signal
+            | GDScriptNodeKind::Function
+            | GDScriptNodeKind::Constructor
+    )
+}
+
+/// Reads every annotation that applies to this declaration, in source order.
+///
+/// The grammar attaches an annotation written on the same line to the
+/// declaration and leaves one written on its own line as a sibling in front of
+/// it. Both apply to the declaration in Godot, so both belong on the record.
+/// Reading only the attached ones drops `@abstract` written above a function,
+/// which is the same bug in a different spelling as the one this index exists
+/// to end.
 fn collect_annotations<'a>(
     node: &Node,
     source: &'a str,
     annotations: &mut Vec<AnnotationRecord<'a>>,
 ) {
+    // Walk back over the annotations written above the declaration. Comments
+    // can sit between them and the declaration without breaking the binding.
+    let mut annotations_above = Vec::new();
+    let mut previous_sibling = node.prev_named_sibling();
+    while let Some(sibling) = previous_sibling {
+        let sibling_kind = GDScriptNodeKind::get_kind_from_ast_node(sibling);
+        if sibling_kind == GDScriptNodeKind::Comment {
+            previous_sibling = sibling.prev_named_sibling();
+            continue;
+        }
+        if sibling_kind != GDScriptNodeKind::Annotation {
+            break;
+        }
+        annotations_above.push(sibling);
+        previous_sibling = sibling.prev_named_sibling();
+    }
+    for annotation_index in (0..annotations_above.len()).rev() {
+        push_annotation(&annotations_above[annotation_index], source, annotations);
+    }
+
     let Some(annotations_node) =
         find_first_named_child_of_kind(node, GDScriptNodeKind::Annotations)
     else {
@@ -325,26 +414,88 @@ fn collect_annotations<'a>(
         {
             continue;
         }
-        let Some(name_node) =
-            find_first_named_child_of_kind(&annotation_node, GDScriptNodeKind::Identifier)
-        else {
-            continue;
-        };
-        let mut arguments = Vec::new();
-        if let Some(arguments_node) = annotation_node.child_by_field_name("arguments") {
-            for argument_index in 0..arguments_node.named_child_count() {
-                let Some(argument_node) = arguments_node.named_child(argument_index as u32) else {
-                    continue;
-                };
-                arguments.push(get_node_text(&argument_node, source).trim());
-            }
-        }
-        annotations.push(AnnotationRecord {
-            name: get_node_text(&name_node, source),
-            arguments,
-            range: get_range(&annotation_node),
-        });
+        push_annotation(&annotation_node, source, annotations);
     }
+}
+
+pub fn push_annotation<'a>(
+    annotation_node: &Node,
+    source: &'a str,
+    annotations: &mut Vec<AnnotationRecord<'a>>,
+) {
+    let Some(name_node) =
+        find_first_named_child_of_kind(annotation_node, GDScriptNodeKind::Identifier)
+    else {
+        return;
+    };
+    let mut arguments = Vec::new();
+    if let Some(arguments_node) = annotation_node.child_by_field_name("arguments") {
+        for argument_index in 0..arguments_node.named_child_count() {
+            let Some(argument_node) = arguments_node.named_child(argument_index as u32) else {
+                continue;
+            };
+            arguments.push(get_node_text(&argument_node, source).trim());
+        }
+    }
+    annotations.push(AnnotationRecord {
+        name: get_node_text(&name_node, source),
+        arguments,
+        range: get_range(annotation_node),
+    });
+}
+
+/// The declaration's range covers its annotations, including the ones written
+/// above it that the grammar leaves outside the declaration node.
+fn get_declaration_range(node: &Node, annotations: &[AnnotationRecord]) -> SourceRange {
+    let mut range = get_range(node);
+    let Some(first_annotation) = annotations.first() else {
+        return range;
+    };
+    if first_annotation.range.start_byte >= range.start_byte {
+        return range;
+    }
+    range.start_row = first_annotation.range.start_row;
+    range.start_column = first_annotation.range.start_column;
+    range.start_byte = first_annotation.range.start_byte;
+    range
+}
+
+/// Reads what a class extends, as written: a class name such as `Node` or
+/// `Qux.Inner`, or a `"res://path.gd"` string with its quotes.
+///
+/// The string form keeps its quotes because every other source-text field does,
+/// and the `string_literal` record for that same string already carries the
+/// path with its escapes resolved.
+pub fn read_extends_text<'a>(extends_statement: &Node, source: &'a str) -> Option<&'a str> {
+    for child_index in 0..extends_statement.named_child_count() {
+        let child = extends_statement.named_child(child_index as u32)?;
+        if matches!(
+            GDScriptNodeKind::get_kind_from_ast_node(child),
+            GDScriptNodeKind::Type | GDScriptNodeKind::String
+        ) {
+            return Some(get_node_text(&child, source).trim());
+        }
+    }
+    None
+}
+
+/// Finds the `extends` that applies to a class declaration.
+///
+/// `class_name Foo extends Bar` nests the extends inside the class_name
+/// statement, while `class_name Foo` on one line and `extends Bar` on the next
+/// leaves it as a sibling. Both mean the same thing.
+fn find_extends_for_class<'a>(node: &Node, source: &'a str) -> Option<&'a str> {
+    if let Some(extends_statement) = node.child_by_field_name("extends") {
+        return read_extends_text(&extends_statement, source);
+    }
+    let parent = node.parent()?;
+    for child_index in 0..parent.named_child_count() {
+        let child = parent.named_child(child_index as u32)?;
+        if GDScriptNodeKind::get_kind_from_ast_node(child) == GDScriptNodeKind::Extends {
+            return read_extends_text(&child, source);
+        }
+    }
+    None
 }
 
 fn has_annotation_named(annotations: &[AnnotationRecord], name: &str) -> bool {
@@ -413,32 +564,11 @@ fn write_declaration_record(record: &DeclarationRecord, scope: &str, output: &mu
     if let Some(default_value) = record.default_value {
         json_push_string_field("default", default_value, output);
     }
-
-    if !record.annotations.is_empty() {
-        json_push_field_name("annotations", output);
-        output.push('[');
-        for (annotation_index, annotation) in record.annotations.iter().enumerate() {
-            if annotation_index > 0 {
-                output.push(',');
-            }
-            output.push_str("{\"name\":");
-            json_push_escaped_string(annotation.name, output);
-            if !annotation.arguments.is_empty() {
-                json_push_field_name("arguments", output);
-                output.push('[');
-                for (argument_index, argument) in annotation.arguments.iter().enumerate() {
-                    if argument_index > 0 {
-                        output.push(',');
-                    }
-                    json_push_escaped_string(argument, output);
-                }
-                output.push(']');
-            }
-            json_push_range_field("range", &annotation.range, output);
-            output.push('}');
-        }
-        output.push(']');
+    if let Some(extends) = record.extends {
+        json_push_string_field("extends", extends, output);
     }
+
+    write_annotations_field(&record.annotations, output);
 
     if record.is_static || record.is_abstract {
         json_push_field_name("modifiers", output);

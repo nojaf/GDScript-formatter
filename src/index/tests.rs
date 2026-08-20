@@ -31,8 +31,8 @@ func _process(_delta: float) -> void:
 	self.clock.ziggy = "x"
 	self.call("late_bound")
 "#####;
-        let expected = r#####"{"record":"file","schema":1,"path":"res://test.gd"}
-{"record":"declaration","kind":"class","name":"Hud","scope":"","range":{"start_row":1,"start_column":1,"end_row":1,"end_column":15,"start_byte":0,"end_byte":14},"name_range":{"start_row":1,"start_column":12,"end_row":1,"end_column":15,"start_byte":11,"end_byte":14}}
+        let expected = r#####"{"record":"file","schema":1,"path":"res://test.gd","extends":"CanvasLayer"}
+{"record":"declaration","kind":"class","name":"Hud","scope":"","range":{"start_row":1,"start_column":1,"end_row":1,"end_column":15,"start_byte":0,"end_byte":14},"name_range":{"start_row":1,"start_column":12,"end_row":1,"end_column":15,"start_byte":11,"end_byte":14},"extends":"CanvasLayer"}
 {"record":"reference","name":"CanvasLayer","scope":"","range":{"start_row":2,"start_column":9,"end_row":2,"end_column":20,"start_byte":23,"end_byte":34},"name_range":{"start_row":2,"start_column":9,"end_row":2,"end_column":20,"start_byte":23,"end_byte":34},"context":"type"}
 {"record":"declaration","kind":"variable","name":"clock","scope":"","range":{"start_row":4,"start_column":1,"end_row":4,"end_column":35,"start_byte":36,"end_byte":70},"name_range":{"start_row":4,"start_column":14,"end_row":4,"end_column":19,"start_byte":49,"end_byte":54},"type":"Label","default":"$Clock","annotations":[{"name":"onready","range":{"start_row":4,"start_column":1,"end_row":4,"end_column":9,"start_byte":36,"end_byte":44}}]}
 {"record":"reference","name":"Label","scope":"","range":{"start_row":4,"start_column":21,"end_row":4,"end_column":26,"start_byte":56,"end_byte":61},"name_range":{"start_row":4,"start_column":21,"end_row":4,"end_column":26,"start_byte":56,"end_byte":61},"context":"type"}
@@ -253,6 +253,90 @@ var health := 5  # trailing
         assert_eq!(index_to_string(source), expected);
     }
 
+    /// Most scripts have no `class_name`, so the base of the file's own script
+    /// goes on the file header. A consumer working out which script broke first
+    /// needs the base of every script, not only of the named ones.
+    #[test]
+    fn test_extends_is_reported_for_a_script_with_no_class_name() {
+        let source = r#####"extends "res://base/thing.gd"
+
+func _ready() -> void:
+	pass
+"#####;
+        let expected = r#####"{"record":"file","schema":1,"path":"res://test.gd","extends":"\"res://base/thing.gd\""}
+{"record":"string_literal","value":"res://base/thing.gd","scope":"","range":{"start_row":1,"start_column":9,"end_row":1,"end_column":30,"start_byte":8,"end_byte":29}}
+{"record":"declaration","kind":"function","name":"_ready","scope":"","range":{"start_row":3,"start_column":1,"end_row":4,"end_column":6,"start_byte":31,"end_byte":59},"name_range":{"start_row":3,"start_column":6,"end_row":3,"end_column":12,"start_byte":36,"end_byte":42},"type":"void","body_range":{"start_row":3,"start_column":23,"end_row":4,"end_column":6,"start_byte":53,"end_byte":59},"body_is_pass_only":true}
+{"record":"reference","name":"void","scope":"_ready","range":{"start_row":3,"start_column":18,"end_row":3,"end_column":22,"start_byte":48,"end_byte":52},"name_range":{"start_row":3,"start_column":18,"end_row":3,"end_column":22,"start_byte":48,"end_byte":52},"context":"type"}
+"#####;
+        assert_eq!(index_to_string(source), expected);
+    }
+
+    /// An annotation written above a declaration applies to it in Godot, but the
+    /// grammar leaves it as a sibling rather than attaching it. Reading only the
+    /// attached ones drops `@abstract` written on its own line, which is the
+    /// same bug in a different spelling as the one this index exists to end.
+    #[test]
+    fn test_annotations_written_above_a_declaration_still_attach() {
+        let source = r#####"@abstract
+func may_target(candidate: Node) -> bool
+
+
+@export
+var health := 5
+"#####;
+        let expected = r#####"{"record":"file","schema":1,"path":"res://test.gd"}
+{"record":"declaration","kind":"function","name":"may_target","scope":"","range":{"start_row":1,"start_column":1,"end_row":2,"end_column":41,"start_byte":0,"end_byte":50},"name_range":{"start_row":2,"start_column":6,"end_row":2,"end_column":16,"start_byte":15,"end_byte":25},"type":"bool","annotations":[{"name":"abstract","range":{"start_row":1,"start_column":1,"end_row":1,"end_column":10,"start_byte":0,"end_byte":9}}],"modifiers":["abstract"],"parameters":[{"name":"candidate","type":"Node","range":{"start_row":2,"start_column":17,"end_row":2,"end_column":32,"start_byte":26,"end_byte":41}}],"body_range":null}
+{"record":"declaration","kind":"parameter","name":"candidate","scope":"may_target","range":{"start_row":2,"start_column":17,"end_row":2,"end_column":32,"start_byte":26,"end_byte":41},"name_range":{"start_row":2,"start_column":17,"end_row":2,"end_column":26,"start_byte":26,"end_byte":35},"type":"Node"}
+{"record":"reference","name":"Node","scope":"may_target","range":{"start_row":2,"start_column":28,"end_row":2,"end_column":32,"start_byte":37,"end_byte":41},"name_range":{"start_row":2,"start_column":28,"end_row":2,"end_column":32,"start_byte":37,"end_byte":41},"context":"type"}
+{"record":"reference","name":"bool","scope":"may_target","range":{"start_row":2,"start_column":37,"end_row":2,"end_column":41,"start_byte":46,"end_byte":50},"name_range":{"start_row":2,"start_column":37,"end_row":2,"end_column":41,"start_byte":46,"end_byte":50},"context":"type"}
+{"record":"declaration","kind":"variable","name":"health","scope":"","range":{"start_row":5,"start_column":1,"end_row":6,"end_column":16,"start_byte":53,"end_byte":76},"name_range":{"start_row":6,"start_column":5,"end_row":6,"end_column":11,"start_byte":65,"end_byte":71},"default":"5","annotations":[{"name":"export","range":{"start_row":5,"start_column":1,"end_row":5,"end_column":8,"start_byte":53,"end_byte":60}}]}
+"#####;
+        assert_eq!(index_to_string(source), expected);
+    }
+
+    /// `@tool` above a bare `extends` has no declaration to bind to, and it is
+    /// the most common own-line annotation in real projects. Annotations no
+    /// declaration claims become records of their own, so between the two none
+    /// is reported twice and none falls out of the index.
+    #[test]
+    fn test_annotations_no_declaration_claims_become_their_own_records() {
+        let source = r#####"@tool
+extends EditorPlugin
+
+
+func _ready() -> void:
+	pass
+"#####;
+        let expected = r#####"{"record":"file","schema":1,"path":"res://test.gd","extends":"EditorPlugin"}
+{"record":"annotation","name":"tool","scope":"","range":{"start_row":1,"start_column":1,"end_row":1,"end_column":6,"start_byte":0,"end_byte":5}}
+{"record":"reference","name":"EditorPlugin","scope":"","range":{"start_row":2,"start_column":9,"end_row":2,"end_column":21,"start_byte":14,"end_byte":26},"name_range":{"start_row":2,"start_column":9,"end_row":2,"end_column":21,"start_byte":14,"end_byte":26},"context":"type"}
+{"record":"declaration","kind":"function","name":"_ready","scope":"","range":{"start_row":5,"start_column":1,"end_row":6,"end_column":6,"start_byte":29,"end_byte":57},"name_range":{"start_row":5,"start_column":6,"end_row":5,"end_column":12,"start_byte":34,"end_byte":40},"type":"void","body_range":{"start_row":5,"start_column":23,"end_row":6,"end_column":6,"start_byte":51,"end_byte":57},"body_is_pass_only":true}
+{"record":"reference","name":"void","scope":"_ready","range":{"start_row":5,"start_column":18,"end_row":5,"end_column":22,"start_byte":46,"end_byte":50},"name_range":{"start_row":5,"start_column":18,"end_row":5,"end_column":22,"start_byte":46,"end_byte":50},"context":"type"}
+"#####;
+        assert_eq!(index_to_string(source), expected);
+    }
+
+    /// `_init` is a keyword in the grammar rather than a name node, and keywords
+    /// are anonymous, so a scan over named children never saw it and every
+    /// constructor in a project was missing from the index.
+    #[test]
+    fn test_a_constructor_is_a_function_declaration_named_init() {
+        let source = r#####"extends Node
+
+
+func _init(a: int = 1) -> void:
+	pass
+"#####;
+        let expected = r#####"{"record":"file","schema":1,"path":"res://test.gd","extends":"Node"}
+{"record":"reference","name":"Node","scope":"","range":{"start_row":1,"start_column":9,"end_row":1,"end_column":13,"start_byte":8,"end_byte":12},"name_range":{"start_row":1,"start_column":9,"end_row":1,"end_column":13,"start_byte":8,"end_byte":12},"context":"type"}
+{"record":"declaration","kind":"function","name":"_init","scope":"","range":{"start_row":4,"start_column":1,"end_row":5,"end_column":6,"start_byte":15,"end_byte":52},"name_range":{"start_row":4,"start_column":6,"end_row":4,"end_column":11,"start_byte":20,"end_byte":25},"type":"void","parameters":[{"name":"a","type":"int","default":"1","range":{"start_row":4,"start_column":12,"end_row":4,"end_column":22,"start_byte":26,"end_byte":36}}],"body_range":{"start_row":4,"start_column":32,"end_row":5,"end_column":6,"start_byte":46,"end_byte":52},"body_is_pass_only":true}
+{"record":"declaration","kind":"parameter","name":"a","scope":"_init","range":{"start_row":4,"start_column":12,"end_row":4,"end_column":22,"start_byte":26,"end_byte":36},"name_range":{"start_row":4,"start_column":12,"end_row":4,"end_column":13,"start_byte":26,"end_byte":27},"type":"int","default":"1"}
+{"record":"reference","name":"int","scope":"_init","range":{"start_row":4,"start_column":15,"end_row":4,"end_column":18,"start_byte":29,"end_byte":32},"name_range":{"start_row":4,"start_column":15,"end_row":4,"end_column":18,"start_byte":29,"end_byte":32},"context":"type"}
+{"record":"reference","name":"void","scope":"_init","range":{"start_row":4,"start_column":27,"end_row":4,"end_column":31,"start_byte":41,"end_byte":45},"name_range":{"start_row":4,"start_column":27,"end_row":4,"end_column":31,"start_byte":41,"end_byte":45},"context":"type"}
+"#####;
+        assert_eq!(index_to_string(source), expected);
+    }
+
     #[test]
     fn test_a_file_that_fails_to_parse_emits_only_its_header() {
         let mut output = String::new();
@@ -343,5 +427,211 @@ var health := 5  # trailing
         assert!(error.contains("mix res:// paths"), "{}", error);
 
         std::fs::remove_dir_all(temporary_directory).unwrap();
+    }
+
+    /// Indexes every fixture in `tests/input` and checks that nothing falls out
+    /// on the way.
+    ///
+    /// This is the test that found two real bugs: constructors produced no
+    /// declaration at all because `_init` is an anonymous keyword, and
+    /// annotations that belonged to no declaration were dropped. Both were
+    /// invisible to tests that assert on hand-written fixtures, because the
+    /// fixture only proves what someone thought to write down. Counting nodes
+    /// against records over a corpus proves what is missing.
+    #[test]
+    fn test_no_construct_is_silently_dropped_across_the_fixture_corpus() {
+        let fixture_directory =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/input");
+        let config = FormatterConfiguration::default();
+
+        let mut node_counts: std::collections::BTreeMap<String, usize> =
+            std::collections::BTreeMap::new();
+        let mut record_counts: std::collections::BTreeMap<String, usize> =
+            std::collections::BTreeMap::new();
+        let mut files_checked = 0;
+
+        for entry in std::fs::read_dir(&fixture_directory).unwrap() {
+            let path = entry.unwrap().path();
+            if path.extension().is_none_or(|extension| extension != "gd") {
+                continue;
+            }
+            let Ok(source) = std::fs::read_to_string(&path) else {
+                continue;
+            };
+            let Some(parsed) = ParseInput::new(&source, &config) else {
+                continue;
+            };
+            // A file with parse errors emits a header and nothing else, so it
+            // would unbalance every count.
+            if parsed.has_parse_errors {
+                continue;
+            }
+            files_checked += 1;
+            count_nodes(&parsed.tree.root_node(), &mut node_counts);
+
+            let mut output = String::new();
+            index_source(&source, "res://fixture.gd", &mut output);
+            count_records(&output, &mut record_counts);
+        }
+
+        assert!(
+            files_checked > 50,
+            "expected a corpus, got {}",
+            files_checked
+        );
+
+        let node = |kind: &str| node_counts.get(kind).copied().unwrap_or(0);
+        let record = |kind: &str| record_counts.get(kind).copied().unwrap_or(0);
+
+        assert_eq!(node("comment"), record("comment"), "comments");
+        assert_eq!(
+            node("string") + node("string_name") + node("node_path"),
+            record("string_literal"),
+            "string literals"
+        );
+        assert_eq!(node("attribute"), record("member_chain"), "member chains");
+        // Every annotation is either reported on a declaration or is a record.
+        assert_eq!(
+            node("annotation"),
+            record("annotations_on_declarations") + record("annotation"),
+            "annotations"
+        );
+        assert_eq!(
+            node("function_definition") + node("constructor_definition") + node("lambda_named"),
+            record("declaration:function"),
+            "functions, constructors and named lambdas"
+        );
+        assert_eq!(
+            node("class_name_statement") + node("class_definition") + node("inner_class"),
+            record("declaration:class"),
+            "classes"
+        );
+        assert_eq!(
+            node("signal_statement"),
+            record("declaration:signal"),
+            "signals"
+        );
+        assert_eq!(
+            node("enumerator"),
+            record("declaration:enum_member"),
+            "enum members"
+        );
+        assert_eq!(
+            node("const_statement"),
+            record("declaration:constant"),
+            "constants"
+        );
+        assert_eq!(
+            node("enum_definition") - node("enum_anonymous"),
+            record("declaration:enum"),
+            "named enums"
+        );
+        assert_eq!(
+            node("variable_statement")
+                + node("export_variable_statement")
+                + node("onready_variable_statement")
+                + node("for_statement"),
+            record("declaration:variable"),
+            "variables and loop bindings"
+        );
+    }
+
+    fn count_nodes(
+        node: &tree_sitter::Node,
+        counts: &mut std::collections::BTreeMap<String, usize>,
+    ) {
+        if node.is_named() {
+            *counts.entry(node.kind().to_string()).or_insert(0) += 1;
+            if node.kind() == "lambda" && node.child_by_field_name("name").is_some() {
+                *counts.entry("lambda_named".to_string()).or_insert(0) += 1;
+            }
+            if node.kind() == "enum_definition" && node.child_by_field_name("name").is_none() {
+                *counts.entry("enum_anonymous".to_string()).or_insert(0) += 1;
+            }
+        }
+        let mut cursor = node.walk();
+        if cursor.goto_first_child() {
+            loop {
+                count_nodes(&cursor.node(), counts);
+                if !cursor.goto_next_sibling() {
+                    break;
+                }
+            }
+        }
+    }
+
+    /// Tallies records by kind without a JSON parser: the field order is fixed
+    /// by the writer, so the leading text of each line identifies it.
+    fn count_records(output: &str, counts: &mut std::collections::BTreeMap<String, usize>) {
+        for line in output.lines() {
+            let Some(record_start) = line.strip_prefix("{\"record\":\"") else {
+                continue;
+            };
+            let Some(quote_position) = record_start.find('"') else {
+                continue;
+            };
+            let record_kind = &record_start[..quote_position];
+            *counts.entry(record_kind.to_string()).or_insert(0) += 1;
+
+            if record_kind == "declaration" {
+                let after_kind = record_start[quote_position..]
+                    .strip_prefix("\",\"kind\":\"")
+                    .expect("a declaration writes its kind straight after the record name");
+                let kind_end = after_kind.find('"').expect("kind is quoted");
+                *counts
+                    .entry(format!("declaration:{}", &after_kind[..kind_end]))
+                    .or_insert(0) += 1;
+            }
+
+            *counts
+                .entry("annotations_on_declarations".to_string())
+                .or_insert(0) += count_annotations_on_declaration(line);
+        }
+    }
+
+    /// Counts the objects in a record's `annotations` array.
+    ///
+    /// `parameters` entries open with the same `{"name":` text, so this walks the
+    /// array by bracket depth rather than searching for a substring, and skips
+    /// brackets that appear inside strings.
+    fn count_annotations_on_declaration(line: &str) -> usize {
+        let marker = ",\"annotations\":[";
+        let Some(annotations_start) = line.find(marker) else {
+            return 0;
+        };
+
+        let bytes = line.as_bytes();
+        let mut position = annotations_start + marker.len();
+        let mut depth = 1;
+        let mut is_inside_string = false;
+        let mut is_escaped = false;
+        let mut annotation_count = 0;
+
+        while position < bytes.len() && depth > 0 {
+            let byte = bytes[position];
+            if is_inside_string {
+                if is_escaped {
+                    is_escaped = false;
+                } else if byte == b'\\' {
+                    is_escaped = true;
+                } else if byte == b'"' {
+                    is_inside_string = false;
+                }
+            } else if byte == b'"' {
+                is_inside_string = true;
+            } else if byte == b'{' {
+                if depth == 1 {
+                    annotation_count += 1;
+                }
+                depth += 1;
+            } else if byte == b'[' {
+                depth += 1;
+            } else if byte == b']' || byte == b'}' {
+                depth -= 1;
+            }
+            position += 1;
+        }
+
+        annotation_count
     }
 }

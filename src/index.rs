@@ -44,16 +44,22 @@ pub const INDEX_SCHEMA_VERSION: usize = 1;
 pub fn index_source(source: &str, display_path: &str, output: &mut String) -> bool {
     let config = FormatterConfiguration::default();
     let Some(parsed) = ParseInput::new(source, &config) else {
-        write_file_header_record(display_path, true, output);
+        write_file_header_record(display_path, true, None, output);
         return false;
     };
 
     if parsed.has_parse_errors {
-        write_file_header_record(display_path, true, output);
+        write_file_header_record(display_path, true, None, output);
         return false;
     }
 
-    write_file_header_record(display_path, false, output);
+    let root_node = parsed.tree.root_node();
+    write_file_header_record(
+        display_path,
+        false,
+        find_script_extends(&root_node, source),
+        output,
+    );
 
     let collectors_by_node_kind = build_collector_lookup();
     let mut state = IndexWalkState {
@@ -61,7 +67,7 @@ pub fn index_source(source: &str, display_path: &str, output: &mut String) -> bo
         collectors_by_node_kind: &collectors_by_node_kind,
         current_scope: String::new(),
     };
-    visit_node(&parsed.tree.root_node(), &mut state, output);
+    visit_node(&root_node, &mut state, output);
     true
 }
 
@@ -214,14 +220,46 @@ fn build_display_path(file_path: &Path, project_root: Option<&Path>) -> Result<S
     Ok(display_path)
 }
 
-fn write_file_header_record(display_path: &str, has_parse_error: bool, output: &mut String) {
+fn write_file_header_record(
+    display_path: &str,
+    has_parse_error: bool,
+    extends: Option<&str>,
+    output: &mut String,
+) {
     output.push_str("{\"record\":\"file\"");
     json_push_usize_field("schema", INDEX_SCHEMA_VERSION, output);
     json_push_string_field("path", display_path, output);
+    if let Some(extends) = extends {
+        json_push_string_field("extends", extends, output);
+    }
     if has_parse_error {
         json_push_bool_field("parse_error", true, output);
     }
     output.push_str("}\n");
+}
+
+/// Reads what the file's own script extends, as written.
+///
+/// This sits on the file header rather than only on a `class` declaration
+/// because most scripts have no `class_name`, and a consumer building a
+/// "which script broke first" graph needs the base of every script, not only of
+/// the named ones.
+fn find_script_extends<'a>(root_node: &Node, source: &'a str) -> Option<&'a str> {
+    for child_index in 0..root_node.named_child_count() {
+        let child = root_node.named_child(child_index as u32)?;
+        let child_kind = GDScriptNodeKind::get_kind_from_ast_node(child);
+        if child_kind == GDScriptNodeKind::Extends {
+            return collectors::declaration::read_extends_text(&child, source);
+        }
+        // `class_name Foo extends Bar` keeps the extends inside the class_name
+        // statement instead of leaving it as a sibling.
+        if child_kind == GDScriptNodeKind::ClassName
+            && let Some(extends_statement) = child.child_by_field_name("extends")
+        {
+            return collectors::declaration::read_extends_text(&extends_statement, source);
+        }
+    }
+    None
 }
 
 struct IndexWalkState<'a> {

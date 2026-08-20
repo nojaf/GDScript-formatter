@@ -5,6 +5,7 @@
 //! no state, so the registry stores plain function pointers rather than trait
 //! objects.
 
+pub mod annotation;
 pub mod comment;
 pub mod comparison;
 pub mod declaration;
@@ -59,6 +60,10 @@ pub const ALL_COLLECTORS: &[CollectorDefinition] = &[
     CollectorDefinition {
         target_node_kinds: comment::TARGET_NODE_KINDS,
         collect: comment::collect,
+    },
+    CollectorDefinition {
+        target_node_kinds: annotation::TARGET_NODE_KINDS,
+        collect: annotation::collect,
     },
 ];
 
@@ -183,6 +188,23 @@ pub fn is_field_of(parent: &Node, field_name: &str, node: &Node) -> bool {
         Some(field_node) => field_node.id() == node.id(),
         None => false,
     }
+}
+
+/// Finds a child by kind, including the anonymous ones.
+///
+/// Keyword children such as the `_init` of a constructor are anonymous in the
+/// grammar, so a scan over named children alone never sees them.
+pub fn find_first_child_of_kind<'tree>(
+    node: &Node<'tree>,
+    node_kind: GDScriptNodeKind,
+) -> Option<Node<'tree>> {
+    for child_index in 0..node.child_count() {
+        let child = node.child(child_index as u32)?;
+        if GDScriptNodeKind::get_kind_from_ast_node(child) == node_kind {
+            return Some(child);
+        }
+    }
+    None
 }
 
 pub fn find_first_named_child_of_kind<'tree>(
