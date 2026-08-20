@@ -337,6 +337,28 @@ func _init(a: int = 1) -> void:
         assert_eq!(index_to_string(source), expected);
     }
 
+    /// Pins the schema version.
+    ///
+    /// Not here to check arithmetic. It is here so that changing a record shape
+    /// takes two deliberate steps rather than one: the exact-output tests above
+    /// fail first, and updating them alone is not enough, because this fails too
+    /// and asks the question those tests cannot. Would a consumer built against
+    /// the old shape misread the new one?
+    ///
+    /// While this producer and its consumer are developed and updated together,
+    /// the answer can be "yes, and that is fine, we will update both" without a
+    /// bump. Record the change in the history in
+    /// `docs/specification_index.md` either way, so a build that turns out to be
+    /// older than expected can be diagnosed rather than guessed at.
+    #[test]
+    fn test_the_schema_version_is_deliberate() {
+        assert_eq!(
+            crate::index::INDEX_SCHEMA_VERSION,
+            1,
+            "the schema version changed: check that the history in docs/specification_index.md changed with it"
+        );
+    }
+
     #[test]
     fn test_a_file_that_fails_to_parse_emits_only_its_header() {
         let mut output = String::new();

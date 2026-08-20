@@ -31,8 +31,22 @@ mod tests;
 
 use collectors::{ALL_COLLECTORS, CollectorContext};
 
-/// Bumped on any breaking change to record shapes or field meanings. Adding a
-/// record kind or an optional field is not breaking.
+/// Bumped whenever a field is renamed, moved, removed, or changes meaning.
+/// Adding a record kind or an optional field is not breaking and does not need
+/// a bump.
+///
+/// The consumer refuses a schema it does not know and exits non-zero. That guard
+/// is the only thing between an incompatible producer and a silently wrong
+/// answer, and it cannot fire if this number does not move. A consumer built
+/// against an older shape reads a field that moved as absent, and absent means
+/// empty rather than unknown, so it reports fewer findings and exits 0: not
+/// distinguishable from a clean project.
+///
+/// That reasoning bites once someone is running a build they cannot rebuild at
+/// will. Until then this producer and its one consumer are developed together
+/// and updated together, so shapes have changed under version 1 by decision
+/// rather than by oversight. `docs/specification_index.md` records which ones,
+/// and names the point at which that stops being the arrangement.
 pub const INDEX_SCHEMA_VERSION: usize = 1;
 
 /// Writes the index for one file: a `file` header record followed by one line

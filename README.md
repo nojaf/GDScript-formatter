@@ -263,7 +263,7 @@ Paths are reported as `res://` paths so they match what the engine reports. The 
 
 The sub-command exits with code 2 when a file fails to parse, and names that file on stderr. The file still gets a header record carrying `"parse_error": true`, so a consumer can tell "no records because the file is broken" apart from "no records because nothing matched". Diagnostics always go to stderr, so stdout stays parseable.
 
-The record shapes, the `scope` and `context` values and the reasoning behind each of them are documented in [docs/specification_index.md](docs/specification_index.md). Note that schema 1 is not stable yet: there is one consumer being written alongside this sub-command, and record shapes still change in place when its experience says they should.
+The record shapes, the `scope` and `context` values and the reasoning behind each of them are documented in [docs/specification_index.md](docs/specification_index.md). The `schema` field is currently 1, and it is bumped whenever a field is renamed, moved, removed, or changes meaning. Adding a record kind or an optional field does not bump it. A consumer should refuse a schema it does not know and exit non-zero, because that check is the only thing standing between an incompatible producer and a silently empty report.
 
 ## Using the formatter in code editors
 

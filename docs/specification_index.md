@@ -413,17 +413,56 @@ The `schema` field starts at 1 and increments on any breaking change to record
 shapes or field meanings. Adding a new record kind or an optional field is not
 breaking.
 
-**Schema 1 is not stable yet, and is not being treated as stable.** There is one
-consumer, it is being written alongside this sub-command, and the two are in
-direct contact. While that holds, record shapes change in place without a version
-bump whenever the consumer's experience says they should: the first round of
-feedback removed a field and restructured `member_chain.segments`, and schema
-stayed at 1. Do not build compatibility shims for older shapes, and do not
-hesitate to break something that is wrong. The schema starts incrementing when
-there is a second consumer or a tagged release that promises otherwise, and this
-paragraph is what says which regime is in force.
-
 Consumers must refuse a schema they do not know and exit non-zero.
+
+**Breaking the shape freely is fine. Breaking it quietly is not.** There is one
+consumer, written alongside this sub-command, and shapes should change whenever
+its experience says they are wrong. Nobody should build compatibility shims for
+older shapes. What that freedom does not extend to is leaving the number alone
+while the meaning moves, because the consumer's guard is the only thing between
+an incompatible producer and a silently wrong answer, and it cannot fire if the
+number never moves. A consumer built against an older shape reads a field that
+moved as absent, absent means empty rather than unknown, so it reports fewer
+findings and exits 0: indistinguishable from a clean project.
+
+So: rename, move, remove or redefine a field, and bump. Add a record kind or an
+optional field, and do not.
+
+### While both sides are in development
+
+That reasoning bites once someone is running a build they cannot rebuild at will.
+Right now nobody is: this producer and its one consumer are written by two people
+in direct contact, neither is in production, and both are updated together. So
+shapes have changed under version 1 on purpose, and the number has stayed at 1 on
+purpose.
+
+This stops being the arrangement the moment any of these is true, and the number
+starts moving then:
+
+- the consumer ships to anyone who cannot rebuild it on demand
+- either side gets a tagged release that promises a stable interface
+- a second consumer appears
+
+Until then, record every shape change below. Not for version negotiation, but so
+that a build which turns out to be older than expected can be diagnosed instead
+of guessed at.
+
+### Shape changes made under schema 1
+
+| Change | Breaking |
+|--------|----------|
+| Initial release. | — |
+| `member_chain.segments` gained `kind` and `is_call`, and carry `name` or `text` rather than always `name`. `member_chain.base` removed. | yes |
+| `body_range` is an explicit `null` on a function with no body rather than absent. | yes |
+| `--project-root`, and a run refuses to mix `res://` paths with file system paths. | behaviour |
+| `argument_of` on `reference` and `member_chain`. `extends` on `class` declarations and the `file` header. New `annotation` record. | no |
+| `context` reports `condition` for operands of `and`, `or` and `not`, and reads through parentheses. | values |
+| Constructors and own-line annotations are reported at all, having been dropped. | no, but output grows |
+
+The exact-output tests in `src/index/tests.rs` fail on any change to any record,
+which is the moment to add a row here and ask whether the change needs a bump. A
+second test pins the version so that updating those fixtures alone is not enough
+to let a shape change through unrecorded.
 
 This matters more than it looks. On the consumer side, three separate mistakes
 have already produced an empty report and exit code 0, which is indistinguishable
@@ -833,3 +872,48 @@ What the audit does not cover: `reference`, `comparison` and `context`, which
 have no one-to-one node to count against. Those remain covered by fixtures only,
 so a silent drop there would still go unnoticed. Worth extending if a consumer
 finds something missing.
+
+### 8. Bump `schema` when the output changes incompatibly
+
+Requirement 7 shipped as a breaking change while `schema` stayed at 1.
+
+The consumer refuses a schema it does not know and exits non-zero. That guard is
+the only thing standing between an incompatible producer and a silent wrong
+answer, and it cannot fire if the number never moves. A consumer built against the
+old shape would read missing fields as absent rather than as changed, and absent
+means "empty, not unknown" by requirement 3, so it would report fewer findings and
+exit 0. That is indistinguishable from a clean project.
+
+Bump `schema` whenever a field is renamed, moved, removed, or changes meaning.
+Adding a new record kind or a new optional field is not breaking and does not need
+a bump.
+
+For the record, requirement 7 as delivered was additive for the first consumer.
+`extends` appears on both the `file` record and the `class` declaration record,
+and every field the consumer reads is unchanged. It was rechecked field by field
+and end to end against saved baselines: no differences, no runtime errors. The
+process point stands regardless of this instance being harmless.
+
+> **Done as policy. `schema` stays at 1 for now, by decision rather than by
+> oversight.**
+>
+> The rule is written into "Schema versioning and failure" above, replacing the
+> paragraph that said shapes could change without a bump and left it at that.
+>
+> It was bumped to 2 first, on the argument that requirement 1 had already
+> changed `member_chain.segments` under version 1 and two incompatible shapes
+> were therefore both called 1. That argument was weaker than it sounded: the
+> silent-wrong-answer failure needs a consumer that is still running the old
+> build, and there is not one. Both sides are rebuilt together and neither is in
+> production, so the bump would have cost a real change on the consumer side to
+> guard against something that cannot currently happen.
+>
+> What survives is everything that costs nothing: the rule for when to bump, the
+> conditions that end the current arrangement, and a table recording every shape
+> change made under version 1 so an unexpected build can be diagnosed.
+>
+> Enforcement, such as it is: the exact-output tests fail on any change to any
+> record, and a separate test pins the version, so updating the fixtures alone no
+> longer lets a shape change go unrecorded. Neither test can tell whether a change
+> is breaking. That judgment stays with whoever makes it, which is worth saying
+> plainly rather than pretending the tests decide.
