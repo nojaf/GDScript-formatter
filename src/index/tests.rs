@@ -36,6 +36,7 @@ func _process(_delta: float) -> void:
 {"record":"reference","name":"CanvasLayer","scope":"","range":{"start_row":2,"start_column":9,"end_row":2,"end_column":20,"start_byte":23,"end_byte":34},"name_range":{"start_row":2,"start_column":9,"end_row":2,"end_column":20,"start_byte":23,"end_byte":34},"context":"type"}
 {"record":"declaration","kind":"variable","name":"clock","scope":"","range":{"start_row":4,"start_column":1,"end_row":4,"end_column":35,"start_byte":36,"end_byte":70},"name_range":{"start_row":4,"start_column":14,"end_row":4,"end_column":19,"start_byte":49,"end_byte":54},"type":"Label","default":"$Clock","annotations":[{"name":"onready","range":{"start_row":4,"start_column":1,"end_row":4,"end_column":9,"start_byte":36,"end_byte":44}}]}
 {"record":"reference","name":"Label","scope":"","range":{"start_row":4,"start_column":21,"end_row":4,"end_column":26,"start_byte":56,"end_byte":61},"name_range":{"start_row":4,"start_column":21,"end_row":4,"end_column":26,"start_byte":56,"end_byte":61},"context":"type"}
+{"record":"node_path","path":"Clock","scope":"","range":{"start_row":4,"start_column":29,"end_row":4,"end_column":35,"start_byte":64,"end_byte":70},"context":"assignment_value"}
 {"record":"declaration","kind":"function","name":"_process","scope":"","range":{"start_row":6,"start_column":1,"end_row":8,"end_column":25,"start_byte":72,"end_byte":158},"name_range":{"start_row":6,"start_column":6,"end_row":6,"end_column":14,"start_byte":77,"end_byte":85},"type":"void","parameters":[{"name":"_delta","type":"float","range":{"start_row":6,"start_column":15,"end_row":6,"end_column":28,"start_byte":86,"end_byte":99}}],"body_range":{"start_row":6,"start_column":38,"end_row":8,"end_column":25,"start_byte":109,"end_byte":158}}
 {"record":"declaration","kind":"parameter","name":"_delta","scope":"_process","range":{"start_row":6,"start_column":15,"end_row":6,"end_column":28,"start_byte":86,"end_byte":99},"name_range":{"start_row":6,"start_column":15,"end_row":6,"end_column":21,"start_byte":86,"end_byte":92},"type":"float"}
 {"record":"reference","name":"float","scope":"_process","range":{"start_row":6,"start_column":23,"end_row":6,"end_column":28,"start_byte":94,"end_byte":99},"name_range":{"start_row":6,"start_column":23,"end_row":6,"end_column":28,"start_byte":94,"end_byte":99},"context":"type"}
@@ -137,6 +138,7 @@ enum { LOOSE }
 {"record":"reference","name":"void","scope":"_ready","range":{"start_row":1,"start_column":18,"end_row":1,"end_column":22,"start_byte":17,"end_byte":21},"name_range":{"start_row":1,"start_column":18,"end_row":1,"end_column":22,"start_byte":17,"end_byte":21},"context":"type"}
 {"record":"member_chain","segments":[{"kind":"self","name":"self","range":{"start_row":2,"start_column":2,"end_row":2,"end_column":6,"start_byte":24,"end_byte":28}},{"kind":"call","name":"get_thing","is_call":true,"range":{"start_row":2,"start_column":7,"end_row":2,"end_column":18,"start_byte":29,"end_byte":40}},{"kind":"identifier","name":"field","range":{"start_row":2,"start_column":19,"end_row":2,"end_column":24,"start_byte":41,"end_byte":46}}],"scope":"_ready","range":{"start_row":2,"start_column":2,"end_row":2,"end_column":24,"start_byte":24,"end_byte":46},"context":"assignment_target"}
 {"record":"member_chain","segments":[{"kind":"node_path","text":"$Clock","range":{"start_row":3,"start_column":2,"end_row":3,"end_column":8,"start_byte":52,"end_byte":58}},{"kind":"identifier","name":"text","range":{"start_row":3,"start_column":9,"end_row":3,"end_column":13,"start_byte":59,"end_byte":63}}],"scope":"_ready","range":{"start_row":3,"start_column":2,"end_row":3,"end_column":13,"start_byte":52,"end_byte":63},"context":"assignment_target"}
+{"record":"node_path","path":"Clock","scope":"_ready","range":{"start_row":3,"start_column":2,"end_row":3,"end_column":8,"start_byte":52,"end_byte":58},"context":"other"}
 {"record":"string_literal","value":"12:00","scope":"_ready","range":{"start_row":3,"start_column":16,"end_row":3,"end_column":23,"start_byte":66,"end_byte":73}}
 {"record":"member_chain","segments":[{"kind":"subscript","name":"items","range":{"start_row":4,"start_column":2,"end_row":4,"end_column":10,"start_byte":75,"end_byte":83}},{"kind":"identifier","name":"name","range":{"start_row":4,"start_column":11,"end_row":4,"end_column":15,"start_byte":84,"end_byte":88}}],"scope":"_ready","range":{"start_row":4,"start_column":2,"end_row":4,"end_column":15,"start_byte":75,"end_byte":88},"context":"assignment_target"}
 {"record":"reference","name":"items","scope":"_ready","range":{"start_row":4,"start_column":2,"end_row":4,"end_column":7,"start_byte":75,"end_byte":80},"name_range":{"start_row":4,"start_column":2,"end_row":4,"end_column":7,"start_byte":75,"end_byte":80},"context":"other"}
@@ -157,6 +159,42 @@ enum { LOOSE }
 {"record":"reference","name":"assert","scope":"_ready","range":{"start_row":2,"start_column":2,"end_row":2,"end_column":34,"start_byte":24,"end_byte":56},"name_range":{"start_row":2,"start_column":2,"end_row":2,"end_column":8,"start_byte":24,"end_byte":30},"is_call":true,"arguments":[{"text":"is_instance_valid(thing)","range":{"start_row":2,"start_column":9,"end_row":2,"end_column":33,"start_byte":31,"end_byte":55}}],"context":"statement"}
 {"record":"reference","name":"is_instance_valid","scope":"_ready","range":{"start_row":2,"start_column":9,"end_row":2,"end_column":33,"start_byte":31,"end_byte":55},"name_range":{"start_row":2,"start_column":9,"end_row":2,"end_column":26,"start_byte":31,"end_byte":48},"is_call":true,"arguments":[{"text":"thing","range":{"start_row":2,"start_column":27,"end_row":2,"end_column":32,"start_byte":49,"end_byte":54}}],"context":"argument","argument_of":{"callee":"assert","index":0}}
 {"record":"reference","name":"thing","scope":"_ready","range":{"start_row":2,"start_column":27,"end_row":2,"end_column":32,"start_byte":49,"end_byte":54},"name_range":{"start_row":2,"start_column":27,"end_row":2,"end_column":32,"start_byte":49,"end_byte":54},"context":"argument","argument_of":{"callee":"is_instance_valid","index":0}}
+"#####;
+        assert_eq!(index_to_string(source), expected);
+    }
+
+    #[test]
+    fn test_every_node_path_expression_is_a_record() {
+        // The chain form was already visible as a segment. The assignment and
+        // the @onready value were not visible anywhere, and those are the lines
+        // a scene check most needs: they are where the node is fetched.
+        let source = r#####"extends Node
+
+@onready var button: Button = $Panel/Button
+@onready var facts: Label = %Facts
+var late: Node
+
+func _ready() -> void:
+	self.late = $"Panel/With Space"
+	$Panel/Button.pressed.connect(_on)
+"#####;
+        let expected = r#####"{"record":"file","schema":1,"path":"res://test.gd","extends":"Node"}
+{"record":"reference","name":"Node","scope":"","range":{"start_row":1,"start_column":9,"end_row":1,"end_column":13,"start_byte":8,"end_byte":12},"name_range":{"start_row":1,"start_column":9,"end_row":1,"end_column":13,"start_byte":8,"end_byte":12},"context":"type"}
+{"record":"declaration","kind":"variable","name":"button","scope":"","range":{"start_row":3,"start_column":1,"end_row":3,"end_column":44,"start_byte":14,"end_byte":57},"name_range":{"start_row":3,"start_column":14,"end_row":3,"end_column":20,"start_byte":27,"end_byte":33},"type":"Button","default":"$Panel/Button","annotations":[{"name":"onready","range":{"start_row":3,"start_column":1,"end_row":3,"end_column":9,"start_byte":14,"end_byte":22}}]}
+{"record":"reference","name":"Button","scope":"","range":{"start_row":3,"start_column":22,"end_row":3,"end_column":28,"start_byte":35,"end_byte":41},"name_range":{"start_row":3,"start_column":22,"end_row":3,"end_column":28,"start_byte":35,"end_byte":41},"context":"type"}
+{"record":"node_path","path":"Panel/Button","scope":"","range":{"start_row":3,"start_column":31,"end_row":3,"end_column":44,"start_byte":44,"end_byte":57},"context":"assignment_value"}
+{"record":"declaration","kind":"variable","name":"facts","scope":"","range":{"start_row":4,"start_column":1,"end_row":4,"end_column":35,"start_byte":58,"end_byte":92},"name_range":{"start_row":4,"start_column":14,"end_row":4,"end_column":19,"start_byte":71,"end_byte":76},"type":"Label","default":"%Facts","annotations":[{"name":"onready","range":{"start_row":4,"start_column":1,"end_row":4,"end_column":9,"start_byte":58,"end_byte":66}}]}
+{"record":"reference","name":"Label","scope":"","range":{"start_row":4,"start_column":21,"end_row":4,"end_column":26,"start_byte":78,"end_byte":83},"name_range":{"start_row":4,"start_column":21,"end_row":4,"end_column":26,"start_byte":78,"end_byte":83},"context":"type"}
+{"record":"node_path","path":"Facts","unique":true,"scope":"","range":{"start_row":4,"start_column":29,"end_row":4,"end_column":35,"start_byte":86,"end_byte":92},"context":"assignment_value"}
+{"record":"declaration","kind":"variable","name":"late","scope":"","range":{"start_row":5,"start_column":1,"end_row":5,"end_column":15,"start_byte":93,"end_byte":107},"name_range":{"start_row":5,"start_column":5,"end_row":5,"end_column":9,"start_byte":97,"end_byte":101},"type":"Node"}
+{"record":"reference","name":"Node","scope":"","range":{"start_row":5,"start_column":11,"end_row":5,"end_column":15,"start_byte":103,"end_byte":107},"name_range":{"start_row":5,"start_column":11,"end_row":5,"end_column":15,"start_byte":103,"end_byte":107},"context":"type"}
+{"record":"declaration","kind":"function","name":"_ready","scope":"","range":{"start_row":7,"start_column":1,"end_row":9,"end_column":36,"start_byte":109,"end_byte":200},"name_range":{"start_row":7,"start_column":6,"end_row":7,"end_column":12,"start_byte":114,"end_byte":120},"type":"void","body_range":{"start_row":7,"start_column":23,"end_row":9,"end_column":36,"start_byte":131,"end_byte":200}}
+{"record":"reference","name":"void","scope":"_ready","range":{"start_row":7,"start_column":18,"end_row":7,"end_column":22,"start_byte":126,"end_byte":130},"name_range":{"start_row":7,"start_column":18,"end_row":7,"end_column":22,"start_byte":126,"end_byte":130},"context":"type"}
+{"record":"member_chain","segments":[{"kind":"self","name":"self","range":{"start_row":8,"start_column":2,"end_row":8,"end_column":6,"start_byte":133,"end_byte":137}},{"kind":"identifier","name":"late","range":{"start_row":8,"start_column":7,"end_row":8,"end_column":11,"start_byte":138,"end_byte":142}}],"scope":"_ready","range":{"start_row":8,"start_column":2,"end_row":8,"end_column":11,"start_byte":133,"end_byte":142},"context":"assignment_target"}
+{"record":"node_path","path":"Panel/With Space","scope":"_ready","range":{"start_row":8,"start_column":14,"end_row":8,"end_column":33,"start_byte":145,"end_byte":164},"context":"assignment_value"}
+{"record":"member_chain","segments":[{"kind":"node_path","text":"$Panel/Button","range":{"start_row":9,"start_column":2,"end_row":9,"end_column":15,"start_byte":166,"end_byte":179}},{"kind":"identifier","name":"pressed","range":{"start_row":9,"start_column":16,"end_row":9,"end_column":23,"start_byte":180,"end_byte":187}},{"kind":"call","name":"connect","is_call":true,"range":{"start_row":9,"start_column":24,"end_row":9,"end_column":36,"start_byte":188,"end_byte":200}}],"scope":"_ready","range":{"start_row":9,"start_column":2,"end_row":9,"end_column":36,"start_byte":166,"end_byte":200},"is_call":true,"arguments":[{"text":"_on","range":{"start_row":9,"start_column":32,"end_row":9,"end_column":35,"start_byte":196,"end_byte":199}}],"context":"statement"}
+{"record":"node_path","path":"Panel/Button","scope":"_ready","range":{"start_row":9,"start_column":2,"end_row":9,"end_column":15,"start_byte":166,"end_byte":179},"context":"other"}
+{"record":"reference","name":"_on","scope":"_ready","range":{"start_row":9,"start_column":32,"end_row":9,"end_column":35,"start_byte":196,"end_byte":199},"name_range":{"start_row":9,"start_column":32,"end_row":9,"end_column":35,"start_byte":196,"end_byte":199},"context":"argument","argument_of":{"callee":"connect","index":0}}
 "#####;
         assert_eq!(index_to_string(source), expected);
     }
@@ -568,6 +606,7 @@ func _init(a: int = 1) -> void:
             "string literals"
         );
         assert_eq!(node("attribute"), record("member_chain"), "member chains");
+        assert_eq!(node("get_node"), record("node_path"), "node paths");
         // Every annotation is either reported on a declaration or is a record.
         assert_eq!(
             node("annotation"),

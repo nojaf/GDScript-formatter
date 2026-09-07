@@ -50,7 +50,7 @@ pub fn collect(node: &Node, context: &CollectorContext, output: &mut String) {
 ///
 /// Unknown escapes keep the character that follows the backslash: the parser
 /// already accepted the file, so refusing to decode here would only lose text.
-fn decode_string_literal(literal_text: &str) -> String {
+pub fn decode_string_literal(literal_text: &str) -> String {
     let without_prefix = literal_text
         .strip_prefix('&')
         .or_else(|| literal_text.strip_prefix('^'))

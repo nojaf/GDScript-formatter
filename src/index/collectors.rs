@@ -10,6 +10,7 @@ pub mod comment;
 pub mod comparison;
 pub mod declaration;
 pub mod member_chain;
+pub mod node_path;
 pub mod reference;
 pub mod string_literal;
 
@@ -52,6 +53,10 @@ pub const ALL_COLLECTORS: &[CollectorDefinition] = &[
     CollectorDefinition {
         target_node_kinds: string_literal::TARGET_NODE_KINDS,
         collect: string_literal::collect,
+    },
+    CollectorDefinition {
+        target_node_kinds: node_path::TARGET_NODE_KINDS,
+        collect: node_path::collect,
     },
     CollectorDefinition {
         target_node_kinds: comparison::TARGET_NODE_KINDS,

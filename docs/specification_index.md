@@ -311,6 +311,24 @@ apart, and it is absent for the common case.
 `assert(is_instance_valid(thing))` reports each level directly instead of making
 the consumer re-parse the `arguments` text of the level above it.
 
+### `node_path`
+
+| Field | Notes |
+|-------|-------|
+| `path` | the path as Godot reads it: `Panel/Button` for `$Panel/Button`, decoded for `$"Panel/With Space"` |
+| `unique` | true for the `%Name` form, absent otherwise |
+| `range`, `scope`, `context` | |
+
+One record per `$Path` or `%Name` expression, wherever it sits. A `$Clock` at
+the head of a member chain was already visible as a `node_path` segment, and a
+bare one was visible nowhere: `self.button = $Panel/Button`, `add_child($X)`
+and the value of an `@onready` variable produced no record. Those are the lines
+a scene check most needs, because they are where the node is fetched, so every
+form is a record here and the chain segment stays as it was.
+
+`get_node("Panel/Button")` is not this record. It is a `string_literal` with
+`argument_of` naming `get_node`, which already says everything a consumer needs.
+
 ### `comparison`
 
 | Field | Notes |
@@ -414,6 +432,7 @@ Output, elided for readability:
 {"record":"file","schema":1,"path":"res://hud/hud.gd"}
 {"record":"declaration","kind":"class","name":"Hud","scope":"","range":{...},"name_range":{...},"annotations":[],"modifiers":[]}
 {"record":"declaration","kind":"variable","name":"clock","scope":"","type":"Label","default":"$Clock","annotations":[{"name":"onready","arguments":[],"range":{...}}],"modifiers":[],"range":{...},"name_range":{...}}
+{"record":"node_path","path":"Clock","scope":"","range":{...},"context":"assignment_value"}
 {"record":"declaration","kind":"function","name":"_process","scope":"","parameters":[{"name":"_delta","type":"float","default":null,"range":{...}}],"modifiers":[],"annotations":[],"body_range":{...},"body_is_pass_only":false,"range":{...},"name_range":{...}}
 {"record":"member_chain","segments":[{"name":"self","range":{...}},{"name":"clock","range":{...}},{"name":"ziggy","range":{...}}],"scope":"_process","is_call":false,"context":"assignment_target","range":{...}}
 {"record":"member_chain","segments":[{"name":"self","range":{...}},{"name":"call","range":{...}}],"scope":"_process","is_call":true,"arguments":[{"text":"\"late_bound\"","range":{...}}],"context":"statement","range":{...}}
@@ -473,6 +492,7 @@ of guessed at.
 | Constructors and own-line annotations are reported at all, having been dropped. | no, but output grows |
 | `is_file_class` on the file's own `class` declaration. | no |
 | An inner class reports its own `extends` or none, having reported the file's. | no, but a wrong value becomes right |
+| New `node_path` record for every `$Path` and `%Name` expression. | no |
 
 The exact-output tests in `src/index/tests.rs` fail on any change to any record,
 which is the moment to add a row here and ask whether the change needs a bump. A
@@ -1031,3 +1051,34 @@ it is given, so an inner class was checked against the outer script's base class
 Every member of `Node` looked available on a plain `RefCounted` helper, and any
 call the helper's real base does not have looked fine. In the fixture corpus:
 19 inner classes, 1 of them given the file's base.
+
+### 10. Report every `$Path` and `%Name` expression
+
+Filed by the consumer while building a check that verifies node paths against
+the scenes a script is attached to. The check needs every place a script fetches
+a node, and the index showed it only some of them:
+
+```gdscript
+@onready var button: Button = $Panel/Button   # declaration.default text only
+self.button = $Panel/Button                   # nothing
+add_child($Panel/Button)                      # argument text only
+$Panel/Button.pressed.connect(_on)            # a node_path segment
+```
+
+Reading the path back out of `default` and argument text is the text scanning
+this index exists to retire, and the assignment form has no text to scan.
+
+Add a `node_path` record per `$` or `%` expression, with the path decoded the
+way a string literal is, and a flag for the unique-name form. Nothing existing
+changes shape; the chain segment stays as it is, since a consumer resolving
+types still needs to know where a chain left the script's own members.
+
+> **Done.** One `node_path` record per `get_node` node in the grammar, with
+> `path`, `unique` for `%Name`, and the usual `scope`, `range` and `context`.
+> The corpus test now holds `get_node` nodes equal to `node_path` records, so
+> a form the collector misses fails the build rather than the consumer.
+>
+> `get_node("...")` calls were deliberately left as they were: the
+> `string_literal` record with `argument_of` already names the callee and the
+> position, and a second record for the same literal would be two facts about
+> one thing.
