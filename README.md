@@ -241,7 +241,7 @@ obj._private_method() # gdlint-ignore
 
 ## Indexing GDScript files for other tools
 
-The `index` sub-command writes a machine-readable index of your GDScript to stdout: declarations, references, member chains, string literals, comparisons and comments, each with the exact source range it came from.
+The `index` sub-command writes a machine-readable index of your GDScript to stdout: declarations, references, member chains, string literals, node paths, comparisons and comments, each with the exact source range it came from.
 
 It exists for tools that know what your code *means* but not *where it is*. A static analyser running inside Godot can ask the engine for every member of a class, every signal's arity and every engine virtual, and knows none of it by line number. Tree-sitter knows exactly where each declaration, call and annotation sits, and nothing about what any of them are. Checks such as "this member does not exist on that type" need both halves, and reconstructing the syntactic half with regular expressions over lines is where such tools break.
 
