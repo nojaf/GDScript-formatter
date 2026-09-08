@@ -254,7 +254,7 @@ gdscript-formatter index --project-root . scripts/player.gd
 The output is [JSON Lines](https://jsonlines.org): one JSON object per line, no enclosing array, so a consumer can parse it incrementally and every line stays small enough for `JSON.parse_string` in GDScript. Each file contributes a header record followed by its content records:
 
 ```jsonl
-{"record":"file","schema":1,"path":"res://hud/hud.gd"}
+{"record":"file","path":"res://hud/hud.gd"}
 {"record":"declaration","kind":"class","name":"Hud","scope":"", ...}
 {"record":"member_chain","segments":[{"name":"self", ...},{"name":"clock", ...}], ...}
 ```
@@ -263,7 +263,7 @@ Paths are reported as `res://` paths so they match what the engine reports. The 
 
 The sub-command exits with code 2 when a file fails to parse, and names that file on stderr. The file still gets a header record carrying `"parse_error": true`, so a consumer can tell "no records because the file is broken" apart from "no records because nothing matched". Diagnostics always go to stderr, so stdout stays parseable.
 
-The record shapes, the `scope` and `context` values and the reasoning behind each of them are documented in [docs/specification_index.md](docs/specification_index.md). The `schema` field is currently 1, and it is bumped whenever a field is renamed, moved, removed, or changes meaning. Adding a record kind or an optional field does not bump it. A consumer should refuse a schema it does not know and exit non-zero, because that check is the only thing standing between an incompatible producer and a silently empty report.
+The record shapes, the `scope` and `context` values and the reasoning behind each of them are documented in [docs/specification_index.md](docs/specification_index.md). The records carry no version: the index exists for one consumer, the [gdscript-linter fork](https://github.com/nojaf/godot-gdscript-linter/tree/nojaf), which is developed alongside it and only ever supports the current shape. Shapes change whenever that consumer's experience says they are wrong, and every change made is listed in the specification so an unexpected build can be diagnosed.
 
 ## Using the formatter in code editors
 

@@ -111,7 +111,7 @@ for `JSON.parse_string` in GDScript.
 Each file produces a header record followed by its content records:
 
 ```jsonl
-{"record": "file", "schema": 1, "path": "res://hud/hud.gd", "extends": "CanvasLayer"}
+{"record": "file", "path": "res://hud/hud.gd", "extends": "CanvasLayer"}
 {"record": "declaration", ...}
 {"record": "member_chain", ...}
 ```
@@ -429,7 +429,7 @@ func _process(_delta: float) -> void:
 Output, elided for readability:
 
 ```jsonl
-{"record":"file","schema":1,"path":"res://hud/hud.gd"}
+{"record":"file","path":"res://hud/hud.gd"}
 {"record":"declaration","kind":"class","name":"Hud","scope":"","range":{...},"name_range":{...},"annotations":[],"modifiers":[]}
 {"record":"declaration","kind":"variable","name":"clock","scope":"","type":"Label","default":"$Clock","annotations":[{"name":"onready","arguments":[],"range":{...}}],"modifiers":[],"range":{...},"name_range":{...}}
 {"record":"node_path","path":"Clock","scope":"","range":{...},"context":"assignment_value"}
@@ -439,47 +439,31 @@ Output, elided for readability:
 {"record":"string_literal","value":"late_bound","scope":"_process","argument_of":{"callee":"call","index":0},"range":{...}}
 ```
 
-## Schema versioning and failure
+## Versioning, or the lack of it
 
-The `schema` field starts at 1 and increments on any breaking change to record
-shapes or field meanings. Adding a new record kind or an optional field is not
-breaking.
+The records carry no version. There is one consumer, the gdscript-linter fork,
+written alongside this sub-command by the same people, and it only ever
+supports the current shape. Shapes should change whenever its experience says
+they are wrong, nobody builds compatibility shims for older shapes, and a
+consumer built against an older shape finds out when its fixtures fail or a
+check crashes, which is the intended signal.
 
-Consumers must refuse a schema they do not know and exit non-zero.
+There used to be a `schema` field on the `file` record, with a rule for when to
+bump it and a consumer that refused a number it did not know. It stayed at 1
+across every incompatible change, by decision, because the failure it guarded
+against needs a consumer running a build it cannot rebuild at will, and there
+was none. A guard that never fires reads as a promise, so the field went. What
+survives is the table below, kept so that a build which turns out to be older
+than expected can be diagnosed instead of guessed at.
 
-**Breaking the shape freely is fine. Breaking it quietly is not.** There is one
-consumer, written alongside this sub-command, and shapes should change whenever
-its experience says they are wrong. Nobody should build compatibility shims for
-older shapes. What that freedom does not extend to is leaving the number alone
-while the meaning moves, because the consumer's guard is the only thing between
-an incompatible producer and a silently wrong answer, and it cannot fire if the
-number never moves. A consumer built against an older shape reads a field that
-moved as absent, absent means empty rather than unknown, so it reports fewer
-findings and exits 0: indistinguishable from a clean project.
-
-So: rename, move, remove or redefine a field, and bump. Add a record kind or an
-optional field, and do not.
-
-### While both sides are in development
-
-That reasoning bites once someone is running a build they cannot rebuild at will.
-Right now nobody is: this producer and its one consumer are written by two people
-in direct contact, neither is in production, and both are updated together. So
-shapes have changed under version 1 on purpose, and the number has stayed at 1 on
-purpose.
-
-This stops being the arrangement the moment any of these is true, and the number
-starts moving then:
+If any of these becomes true, the question of versioning is open again:
 
 - the consumer ships to anyone who cannot rebuild it on demand
 - either side gets a tagged release that promises a stable interface
 - a second consumer appears
 
-Until then, record every shape change below. Not for version negotiation, but so
-that a build which turns out to be older than expected can be diagnosed instead
-of guessed at.
+### Shape changes made
 
-### Shape changes made under schema 1
 
 | Change | Breaking |
 |--------|----------|
@@ -493,11 +477,10 @@ of guessed at.
 | `is_file_class` on the file's own `class` declaration. | no |
 | An inner class reports its own `extends` or none, having reported the file's. | no, but a wrong value becomes right |
 | New `node_path` record for every `$Path` and `%Name` expression. | no |
+| The `schema` field on the `file` record removed. | yes, for a consumer that read it; the one consumer had already stopped |
 
 The exact-output tests in `src/index/tests.rs` fail on any change to any record,
-which is the moment to add a row here and ask whether the change needs a bump. A
-second test pins the version so that updating those fixtures alone is not enough
-to let a shape change through unrecorded.
+which is the moment to add a row here.
 
 This matters more than it looks. On the consumer side, three separate mistakes
 have already produced an empty report and exit code 0, which is indistinguishable
@@ -634,8 +617,7 @@ importance. The first two are correctness problems, the rest are contracts I nee
 stated so I can rely on them.
 
 **All five are implemented.** Each one below carries a note saying what shipped
-and where the answer differs from the request. Schema stayed at 1: see "Schema
-versioning and failure" for why nothing here needed a bump.
+and where the answer differs from the request.
 
 ### 1. Segments must say what they are
 
@@ -908,7 +890,7 @@ have no one-to-one node to count against. Those remain covered by fixtures only,
 so a silent drop there would still go unnoticed. Worth extending if a consumer
 finds something missing.
 
-### 8. Bump `schema` when the output changes incompatibly
+### 8. Bump `schema` when the output changes incompatibly (withdrawn)
 
 Requirement 7 shipped as a breaking change while `schema` stayed at 1.
 
@@ -929,29 +911,25 @@ and every field the consumer reads is unchanged. It was rechecked field by field
 and end to end against saved baselines: no differences, no runtime errors. The
 process point stands regardless of this instance being harmless.
 
-> **Done as policy. `schema` stays at 1 for now, by decision rather than by
-> oversight.**
+> **Withdrawn. The field is gone.**
 >
-> The rule is written into "Schema versioning and failure" above, replacing the
-> paragraph that said shapes could change without a bump and left it at that.
+> It was first done as policy: `schema` stayed at 1 by decision, with a rule
+> for when to bump, a test pinning the number, and a table of every shape
+> change made under it. The argument was that the silent-wrong-answer failure
+> needs a consumer running a build it cannot rebuild at will, and there was
+> none, so a bump would have cost a real change on the consumer side to guard
+> against something that cannot currently happen.
 >
-> It was bumped to 2 first, on the argument that requirement 1 had already
-> changed `member_chain.segments` under version 1 and two incompatible shapes
-> were therefore both called 1. That argument was weaker than it sounded: the
-> silent-wrong-answer failure needs a consumer that is still running the old
-> build, and there is not one. Both sides are rebuilt together and neither is in
-> production, so the bump would have cost a real change on the consumer side to
-> guard against something that cannot currently happen.
+> That argument also disposes of the field. A number that is kept at 1 across
+> incompatible changes is not a version, and a consumer guard that can never
+> fire reads as a promise nobody keeps. The consumer stopped reading it, this
+> side stopped writing it, and the pinning test went with it. The index is a
+> feature of a locally built fork that exists for one consumer, and that
+> consumer only ever supports the current shape.
 >
-> What survives is everything that costs nothing: the rule for when to bump, the
-> conditions that end the current arrangement, and a table recording every shape
-> change made under version 1 so an unexpected build can be diagnosed.
->
-> Enforcement, such as it is: the exact-output tests fail on any change to any
-> record, and a separate test pins the version, so updating the fixtures alone no
-> longer lets a shape change go unrecorded. Neither test can tell whether a change
-> is breaking. That judgment stays with whoever makes it, which is worth saying
-> plainly rather than pretending the tests decide.
+> What survives is the table under "Versioning, or the lack of it", which
+> records every shape change so an unexpected build can be diagnosed, and the
+> list of conditions under which versioning becomes a real question again.
 
 ### 9. Say which `class` record is the file's own `class_name`
 

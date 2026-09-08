@@ -31,7 +31,7 @@ func _process(_delta: float) -> void:
 	self.clock.ziggy = "x"
 	self.call("late_bound")
 "#####;
-        let expected = r#####"{"record":"file","schema":1,"path":"res://test.gd","extends":"CanvasLayer"}
+        let expected = r#####"{"record":"file","path":"res://test.gd","extends":"CanvasLayer"}
 {"record":"declaration","kind":"class","name":"Hud","scope":"","range":{"start_row":1,"start_column":1,"end_row":1,"end_column":15,"start_byte":0,"end_byte":14},"name_range":{"start_row":1,"start_column":12,"end_row":1,"end_column":15,"start_byte":11,"end_byte":14},"extends":"CanvasLayer","is_file_class":true}
 {"record":"reference","name":"CanvasLayer","scope":"","range":{"start_row":2,"start_column":9,"end_row":2,"end_column":20,"start_byte":23,"end_byte":34},"name_range":{"start_row":2,"start_column":9,"end_row":2,"end_column":20,"start_byte":23,"end_byte":34},"context":"type"}
 {"record":"declaration","kind":"variable","name":"clock","scope":"","range":{"start_row":4,"start_column":1,"end_row":4,"end_column":35,"start_byte":36,"end_byte":70},"name_range":{"start_row":4,"start_column":14,"end_row":4,"end_column":19,"start_byte":49,"end_byte":54},"type":"Label","default":"$Clock","annotations":[{"name":"onready","range":{"start_row":4,"start_column":1,"end_row":4,"end_column":9,"start_byte":36,"end_byte":44}}]}
@@ -58,7 +58,7 @@ func _process(_delta: float) -> void:
 static func helper() -> void:
 	pass
 "#####;
-        let expected = r#####"{"record":"file","schema":1,"path":"res://test.gd"}
+        let expected = r#####"{"record":"file","path":"res://test.gd"}
 {"record":"declaration","kind":"function","name":"may_target","scope":"","range":{"start_row":1,"start_column":1,"end_row":1,"end_column":51,"start_byte":0,"end_byte":50},"name_range":{"start_row":1,"start_column":16,"end_row":1,"end_column":26,"start_byte":15,"end_byte":25},"type":"bool","annotations":[{"name":"abstract","range":{"start_row":1,"start_column":1,"end_row":1,"end_column":10,"start_byte":0,"end_byte":9}}],"modifiers":["abstract"],"parameters":[{"name":"candidate","type":"Node","range":{"start_row":1,"start_column":27,"end_row":1,"end_column":42,"start_byte":26,"end_byte":41}}],"body_range":null}
 {"record":"declaration","kind":"parameter","name":"candidate","scope":"may_target","range":{"start_row":1,"start_column":27,"end_row":1,"end_column":42,"start_byte":26,"end_byte":41},"name_range":{"start_row":1,"start_column":27,"end_row":1,"end_column":36,"start_byte":26,"end_byte":35},"type":"Node"}
 {"record":"reference","name":"Node","scope":"may_target","range":{"start_row":1,"start_column":38,"end_row":1,"end_column":42,"start_byte":37,"end_byte":41},"name_range":{"start_row":1,"start_column":38,"end_row":1,"end_column":42,"start_byte":37,"end_byte":41},"context":"type"}
@@ -79,7 +79,7 @@ class Inner:
 		var target := 2
 		print(target)
 "#####;
-        let expected = r#####"{"record":"file","schema":1,"path":"res://test.gd"}
+        let expected = r#####"{"record":"file","path":"res://test.gd"}
 {"record":"declaration","kind":"variable","name":"target","scope":"","range":{"start_row":1,"start_column":1,"end_row":1,"end_column":16,"start_byte":0,"end_byte":15},"name_range":{"start_row":1,"start_column":5,"end_row":1,"end_column":11,"start_byte":4,"end_byte":10},"default":"1"}
 {"record":"declaration","kind":"class","name":"Inner","scope":"","range":{"start_row":3,"start_column":1,"end_row":6,"end_column":16,"start_byte":17,"end_byte":87},"name_range":{"start_row":3,"start_column":7,"end_row":3,"end_column":12,"start_byte":23,"end_byte":28}}
 {"record":"declaration","kind":"function","name":"_ready","scope":"Inner","range":{"start_row":4,"start_column":2,"end_row":6,"end_column":16,"start_byte":31,"end_byte":87},"name_range":{"start_row":4,"start_column":7,"end_row":4,"end_column":13,"start_byte":36,"end_byte":42},"type":"void","body_range":{"start_row":4,"start_column":24,"end_row":6,"end_column":16,"start_byte":53,"end_byte":87}}
@@ -96,7 +96,7 @@ class Inner:
         let source = r#####"enum State { IDLE = 0, RUN }
 enum { LOOSE }
 "#####;
-        let expected = r#####"{"record":"file","schema":1,"path":"res://test.gd"}
+        let expected = r#####"{"record":"file","path":"res://test.gd"}
 {"record":"declaration","kind":"enum","name":"State","scope":"","range":{"start_row":1,"start_column":1,"end_row":1,"end_column":29,"start_byte":0,"end_byte":28},"name_range":{"start_row":1,"start_column":6,"end_row":1,"end_column":11,"start_byte":5,"end_byte":10}}
 {"record":"declaration","kind":"enum_member","name":"IDLE","scope":"State","range":{"start_row":1,"start_column":14,"end_row":1,"end_column":22,"start_byte":13,"end_byte":21},"name_range":{"start_row":1,"start_column":14,"end_row":1,"end_column":18,"start_byte":13,"end_byte":17},"default":"0"}
 {"record":"declaration","kind":"enum_member","name":"RUN","scope":"State","range":{"start_row":1,"start_column":24,"end_row":1,"end_column":27,"start_byte":23,"end_byte":26},"name_range":{"start_row":1,"start_column":24,"end_row":1,"end_column":27,"start_byte":23,"end_byte":26}}
@@ -112,7 +112,7 @@ enum { LOOSE }
 	print("all done")
 	var tabbed := "a\tb"
 "#####;
-        let expected = r#####"{"record":"file","schema":1,"path":"res://test.gd"}
+        let expected = r#####"{"record":"file","path":"res://test.gd"}
 {"record":"declaration","kind":"function","name":"_ready","scope":"","range":{"start_row":1,"start_column":1,"end_row":4,"end_column":22,"start_byte":0,"end_byte":88},"name_range":{"start_row":1,"start_column":6,"end_row":1,"end_column":12,"start_byte":5,"end_byte":11},"type":"void","body_range":{"start_row":1,"start_column":23,"end_row":4,"end_column":22,"start_byte":22,"end_byte":88}}
 {"record":"reference","name":"void","scope":"_ready","range":{"start_row":1,"start_column":18,"end_row":1,"end_column":22,"start_byte":17,"end_byte":21},"name_range":{"start_row":1,"start_column":18,"end_row":1,"end_column":22,"start_byte":17,"end_byte":21},"context":"type"}
 {"record":"member_chain","segments":[{"kind":"self","name":"self","range":{"start_row":2,"start_column":2,"end_row":2,"end_column":6,"start_byte":24,"end_byte":28}},{"kind":"call","name":"call","is_call":true,"range":{"start_row":2,"start_column":7,"end_row":2,"end_column":25,"start_byte":29,"end_byte":47}}],"scope":"_ready","range":{"start_row":2,"start_column":2,"end_row":2,"end_column":25,"start_byte":24,"end_byte":47},"is_call":true,"arguments":[{"text":"\"late_bound\"","range":{"start_row":2,"start_column":12,"end_row":2,"end_column":24,"start_byte":34,"end_byte":46}}],"context":"statement"}
@@ -133,7 +133,7 @@ enum { LOOSE }
 	items[0].name = "a"
 	super._process(1.0)
 "#####;
-        let expected = r#####"{"record":"file","schema":1,"path":"res://test.gd"}
+        let expected = r#####"{"record":"file","path":"res://test.gd"}
 {"record":"declaration","kind":"function","name":"_ready","scope":"","range":{"start_row":1,"start_column":1,"end_row":5,"end_column":21,"start_byte":0,"end_byte":115},"name_range":{"start_row":1,"start_column":6,"end_row":1,"end_column":12,"start_byte":5,"end_byte":11},"type":"void","body_range":{"start_row":1,"start_column":23,"end_row":5,"end_column":21,"start_byte":22,"end_byte":115}}
 {"record":"reference","name":"void","scope":"_ready","range":{"start_row":1,"start_column":18,"end_row":1,"end_column":22,"start_byte":17,"end_byte":21},"name_range":{"start_row":1,"start_column":18,"end_row":1,"end_column":22,"start_byte":17,"end_byte":21},"context":"type"}
 {"record":"member_chain","segments":[{"kind":"self","name":"self","range":{"start_row":2,"start_column":2,"end_row":2,"end_column":6,"start_byte":24,"end_byte":28}},{"kind":"call","name":"get_thing","is_call":true,"range":{"start_row":2,"start_column":7,"end_row":2,"end_column":18,"start_byte":29,"end_byte":40}},{"kind":"identifier","name":"field","range":{"start_row":2,"start_column":19,"end_row":2,"end_column":24,"start_byte":41,"end_byte":46}}],"scope":"_ready","range":{"start_row":2,"start_column":2,"end_row":2,"end_column":24,"start_byte":24,"end_byte":46},"context":"assignment_target"}
@@ -153,7 +153,7 @@ enum { LOOSE }
         let source = r#####"func _ready() -> void:
 	assert(is_instance_valid(thing))
 "#####;
-        let expected = r#####"{"record":"file","schema":1,"path":"res://test.gd"}
+        let expected = r#####"{"record":"file","path":"res://test.gd"}
 {"record":"declaration","kind":"function","name":"_ready","scope":"","range":{"start_row":1,"start_column":1,"end_row":2,"end_column":34,"start_byte":0,"end_byte":56},"name_range":{"start_row":1,"start_column":6,"end_row":1,"end_column":12,"start_byte":5,"end_byte":11},"type":"void","body_range":{"start_row":1,"start_column":23,"end_row":2,"end_column":34,"start_byte":22,"end_byte":56}}
 {"record":"reference","name":"void","scope":"_ready","range":{"start_row":1,"start_column":18,"end_row":1,"end_column":22,"start_byte":17,"end_byte":21},"name_range":{"start_row":1,"start_column":18,"end_row":1,"end_column":22,"start_byte":17,"end_byte":21},"context":"type"}
 {"record":"reference","name":"assert","scope":"_ready","range":{"start_row":2,"start_column":2,"end_row":2,"end_column":34,"start_byte":24,"end_byte":56},"name_range":{"start_row":2,"start_column":2,"end_row":2,"end_column":8,"start_byte":24,"end_byte":30},"is_call":true,"arguments":[{"text":"is_instance_valid(thing)","range":{"start_row":2,"start_column":9,"end_row":2,"end_column":33,"start_byte":31,"end_byte":55}}],"context":"statement"}
@@ -178,7 +178,7 @@ func _ready() -> void:
 	self.late = $"Panel/With Space"
 	$Panel/Button.pressed.connect(_on)
 "#####;
-        let expected = r#####"{"record":"file","schema":1,"path":"res://test.gd","extends":"Node"}
+        let expected = r#####"{"record":"file","path":"res://test.gd","extends":"Node"}
 {"record":"reference","name":"Node","scope":"","range":{"start_row":1,"start_column":9,"end_row":1,"end_column":13,"start_byte":8,"end_byte":12},"name_range":{"start_row":1,"start_column":9,"end_row":1,"end_column":13,"start_byte":8,"end_byte":12},"context":"type"}
 {"record":"declaration","kind":"variable","name":"button","scope":"","range":{"start_row":3,"start_column":1,"end_row":3,"end_column":44,"start_byte":14,"end_byte":57},"name_range":{"start_row":3,"start_column":14,"end_row":3,"end_column":20,"start_byte":27,"end_byte":33},"type":"Button","default":"$Panel/Button","annotations":[{"name":"onready","range":{"start_row":3,"start_column":1,"end_row":3,"end_column":9,"start_byte":14,"end_byte":22}}]}
 {"record":"reference","name":"Button","scope":"","range":{"start_row":3,"start_column":22,"end_row":3,"end_column":28,"start_byte":35,"end_byte":41},"name_range":{"start_row":3,"start_column":22,"end_row":3,"end_column":28,"start_byte":35,"end_byte":41},"context":"type"}
@@ -207,7 +207,7 @@ func _ready() -> void:
 	if target not in [1]:
 		pass
 "#####;
-        let expected = r#####"{"record":"file","schema":1,"path":"res://test.gd"}
+        let expected = r#####"{"record":"file","path":"res://test.gd"}
 {"record":"declaration","kind":"function","name":"_ready","scope":"","range":{"start_row":1,"start_column":1,"end_row":5,"end_column":7,"start_byte":0,"end_byte":79},"name_range":{"start_row":1,"start_column":6,"end_row":1,"end_column":12,"start_byte":5,"end_byte":11},"type":"void","body_range":{"start_row":1,"start_column":23,"end_row":5,"end_column":7,"start_byte":22,"end_byte":79}}
 {"record":"reference","name":"void","scope":"_ready","range":{"start_row":1,"start_column":18,"end_row":1,"end_column":22,"start_byte":17,"end_byte":21},"name_range":{"start_row":1,"start_column":18,"end_row":1,"end_column":22,"start_byte":17,"end_byte":21},"context":"type"}
 {"record":"comparison","operator":"==","left":{"text":"target","range":{"start_row":2,"start_column":5,"end_row":2,"end_column":11,"start_byte":27,"end_byte":33}},"right":{"text":"null","range":{"start_row":2,"start_column":15,"end_row":2,"end_column":19,"start_byte":37,"end_byte":41}},"scope":"_ready","range":{"start_row":2,"start_column":5,"end_row":2,"end_column":19,"start_byte":27,"end_byte":41}}
@@ -223,7 +223,7 @@ func _ready() -> void:
         let source = r#####"## A documented variable.
 var health := 5  # trailing
 "#####;
-        let expected = r#####"{"record":"file","schema":1,"path":"res://test.gd"}
+        let expected = r#####"{"record":"file","path":"res://test.gd"}
 {"record":"comment","text":"## A documented variable.","scope":"","range":{"start_row":1,"start_column":1,"end_row":1,"end_column":26,"start_byte":0,"end_byte":25},"is_documentation":true}
 {"record":"declaration","kind":"variable","name":"health","scope":"","range":{"start_row":2,"start_column":1,"end_row":2,"end_column":16,"start_byte":26,"end_byte":41},"name_range":{"start_row":2,"start_column":5,"end_row":2,"end_column":11,"start_byte":30,"end_byte":36},"default":"5"}
 {"record":"comment","text":"# trailing","scope":"","range":{"start_row":2,"start_column":18,"end_row":2,"end_column":28,"start_byte":43,"end_byte":53},"is_trailing":true}
@@ -237,7 +237,7 @@ var health := 5  # trailing
 	for item: int in [1, 2]:
 		print(item)
 "#####;
-        let expected = r#####"{"record":"file","schema":1,"path":"res://test.gd"}
+        let expected = r#####"{"record":"file","path":"res://test.gd"}
 {"record":"declaration","kind":"function","name":"_ready","scope":"","range":{"start_row":1,"start_column":1,"end_row":3,"end_column":14,"start_byte":0,"end_byte":62},"name_range":{"start_row":1,"start_column":6,"end_row":1,"end_column":12,"start_byte":5,"end_byte":11},"type":"void","body_range":{"start_row":1,"start_column":23,"end_row":3,"end_column":14,"start_byte":22,"end_byte":62}}
 {"record":"reference","name":"void","scope":"_ready","range":{"start_row":1,"start_column":18,"end_row":1,"end_column":22,"start_byte":17,"end_byte":21},"name_range":{"start_row":1,"start_column":18,"end_row":1,"end_column":22,"start_byte":17,"end_byte":21},"context":"type"}
 {"record":"declaration","kind":"variable","name":"item","scope":"_ready","range":{"start_row":2,"start_column":6,"end_row":2,"end_column":10,"start_byte":28,"end_byte":32},"name_range":{"start_row":2,"start_column":6,"end_row":2,"end_column":10,"start_byte":28,"end_byte":32},"type":"int"}
@@ -252,7 +252,7 @@ var health := 5  # trailing
     fn test_a_function_with_no_body_reports_body_range_null() {
         let source = r#####"@abstract func may_target(candidate: Node) -> bool
 "#####;
-        let expected = r#####"{"record":"file","schema":1,"path":"res://test.gd"}
+        let expected = r#####"{"record":"file","path":"res://test.gd"}
 {"record":"declaration","kind":"function","name":"may_target","scope":"","range":{"start_row":1,"start_column":1,"end_row":1,"end_column":51,"start_byte":0,"end_byte":50},"name_range":{"start_row":1,"start_column":16,"end_row":1,"end_column":26,"start_byte":15,"end_byte":25},"type":"bool","annotations":[{"name":"abstract","range":{"start_row":1,"start_column":1,"end_row":1,"end_column":10,"start_byte":0,"end_byte":9}}],"modifiers":["abstract"],"parameters":[{"name":"candidate","type":"Node","range":{"start_row":1,"start_column":27,"end_row":1,"end_column":42,"start_byte":26,"end_byte":41}}],"body_range":null}
 {"record":"declaration","kind":"parameter","name":"candidate","scope":"may_target","range":{"start_row":1,"start_column":27,"end_row":1,"end_column":42,"start_byte":26,"end_byte":41},"name_range":{"start_row":1,"start_column":27,"end_row":1,"end_column":36,"start_byte":26,"end_byte":35},"type":"Node"}
 {"record":"reference","name":"Node","scope":"may_target","range":{"start_row":1,"start_column":38,"end_row":1,"end_column":42,"start_byte":37,"end_byte":41},"name_range":{"start_row":1,"start_column":38,"end_row":1,"end_column":42,"start_byte":37,"end_byte":41},"context":"type"}
@@ -275,7 +275,7 @@ var health := 5  # trailing
 	if self.a is not Node:
 		pass
 "#####;
-        let expected = r#####"{"record":"file","schema":1,"path":"res://test.gd"}
+        let expected = r#####"{"record":"file","path":"res://test.gd"}
 {"record":"declaration","kind":"function","name":"_ready","scope":"","range":{"start_row":1,"start_column":1,"end_row":8,"end_column":7,"start_byte":0,"end_byte":156},"name_range":{"start_row":1,"start_column":6,"end_row":1,"end_column":12,"start_byte":5,"end_byte":11},"type":"void","body_range":{"start_row":1,"start_column":23,"end_row":8,"end_column":7,"start_byte":22,"end_byte":156}}
 {"record":"reference","name":"void","scope":"_ready","range":{"start_row":1,"start_column":18,"end_row":1,"end_column":22,"start_byte":17,"end_byte":21},"name_range":{"start_row":1,"start_column":18,"end_row":1,"end_column":22,"start_byte":17,"end_byte":21},"context":"type"}
 {"record":"member_chain","segments":[{"kind":"self","name":"self","range":{"start_row":2,"start_column":5,"end_row":2,"end_column":9,"start_byte":27,"end_byte":31}},{"kind":"identifier","name":"flag","range":{"start_row":2,"start_column":10,"end_row":2,"end_column":14,"start_byte":32,"end_byte":36}}],"scope":"_ready","range":{"start_row":2,"start_column":5,"end_row":2,"end_column":14,"start_byte":27,"end_byte":36},"context":"condition"}
@@ -301,7 +301,7 @@ var health := 5  # trailing
 func _ready() -> void:
 	pass
 "#####;
-        let expected = r#####"{"record":"file","schema":1,"path":"res://test.gd","extends":"\"res://base/thing.gd\""}
+        let expected = r#####"{"record":"file","path":"res://test.gd","extends":"\"res://base/thing.gd\""}
 {"record":"string_literal","value":"res://base/thing.gd","scope":"","range":{"start_row":1,"start_column":9,"end_row":1,"end_column":30,"start_byte":8,"end_byte":29}}
 {"record":"declaration","kind":"function","name":"_ready","scope":"","range":{"start_row":3,"start_column":1,"end_row":4,"end_column":6,"start_byte":31,"end_byte":59},"name_range":{"start_row":3,"start_column":6,"end_row":3,"end_column":12,"start_byte":36,"end_byte":42},"type":"void","body_range":{"start_row":3,"start_column":23,"end_row":4,"end_column":6,"start_byte":53,"end_byte":59},"body_is_pass_only":true}
 {"record":"reference","name":"void","scope":"_ready","range":{"start_row":3,"start_column":18,"end_row":3,"end_column":22,"start_byte":48,"end_byte":52},"name_range":{"start_row":3,"start_column":18,"end_row":3,"end_column":22,"start_byte":48,"end_byte":52},"context":"type"}
@@ -324,7 +324,7 @@ class Helper extends RefCounted:
 class Plain:
 	var m := 0
 "#####;
-        let expected = r#####"{"record":"file","schema":1,"path":"res://test.gd","extends":"CanvasLayer"}
+        let expected = r#####"{"record":"file","path":"res://test.gd","extends":"CanvasLayer"}
 {"record":"declaration","kind":"class","name":"Hud","scope":"","range":{"start_row":1,"start_column":1,"end_row":1,"end_column":15,"start_byte":0,"end_byte":14},"name_range":{"start_row":1,"start_column":12,"end_row":1,"end_column":15,"start_byte":11,"end_byte":14},"extends":"CanvasLayer","is_file_class":true}
 {"record":"reference","name":"CanvasLayer","scope":"","range":{"start_row":2,"start_column":9,"end_row":2,"end_column":20,"start_byte":23,"end_byte":34},"name_range":{"start_row":2,"start_column":9,"end_row":2,"end_column":20,"start_byte":23,"end_byte":34},"context":"type"}
 {"record":"declaration","kind":"class","name":"Helper","scope":"","range":{"start_row":4,"start_column":1,"end_row":5,"end_column":16,"start_byte":36,"end_byte":84},"name_range":{"start_row":4,"start_column":7,"end_row":4,"end_column":13,"start_byte":42,"end_byte":48},"extends":"RefCounted"}
@@ -354,7 +354,7 @@ class Owned:
 	extends RefCounted
 	var n := 0
 "#####;
-        let expected = r#####"{"record":"file","schema":1,"path":"res://test.gd","extends":"Node"}
+        let expected = r#####"{"record":"file","path":"res://test.gd","extends":"Node"}
 {"record":"reference","name":"Node","scope":"","range":{"start_row":1,"start_column":9,"end_row":1,"end_column":13,"start_byte":8,"end_byte":12},"name_range":{"start_row":1,"start_column":9,"end_row":1,"end_column":13,"start_byte":8,"end_byte":12},"context":"type"}
 {"record":"declaration","kind":"class","name":"Plain","scope":"","range":{"start_row":3,"start_column":1,"end_row":4,"end_column":12,"start_byte":14,"end_byte":38},"name_range":{"start_row":3,"start_column":7,"end_row":3,"end_column":12,"start_byte":20,"end_byte":25}}
 {"record":"declaration","kind":"variable","name":"m","scope":"Plain","range":{"start_row":4,"start_column":2,"end_row":4,"end_column":12,"start_byte":28,"end_byte":38},"name_range":{"start_row":4,"start_column":6,"end_row":4,"end_column":7,"start_byte":32,"end_byte":33},"default":"0"}
@@ -378,7 +378,7 @@ func may_target(candidate: Node) -> bool
 @export
 var health := 5
 "#####;
-        let expected = r#####"{"record":"file","schema":1,"path":"res://test.gd"}
+        let expected = r#####"{"record":"file","path":"res://test.gd"}
 {"record":"declaration","kind":"function","name":"may_target","scope":"","range":{"start_row":1,"start_column":1,"end_row":2,"end_column":41,"start_byte":0,"end_byte":50},"name_range":{"start_row":2,"start_column":6,"end_row":2,"end_column":16,"start_byte":15,"end_byte":25},"type":"bool","annotations":[{"name":"abstract","range":{"start_row":1,"start_column":1,"end_row":1,"end_column":10,"start_byte":0,"end_byte":9}}],"modifiers":["abstract"],"parameters":[{"name":"candidate","type":"Node","range":{"start_row":2,"start_column":17,"end_row":2,"end_column":32,"start_byte":26,"end_byte":41}}],"body_range":null}
 {"record":"declaration","kind":"parameter","name":"candidate","scope":"may_target","range":{"start_row":2,"start_column":17,"end_row":2,"end_column":32,"start_byte":26,"end_byte":41},"name_range":{"start_row":2,"start_column":17,"end_row":2,"end_column":26,"start_byte":26,"end_byte":35},"type":"Node"}
 {"record":"reference","name":"Node","scope":"may_target","range":{"start_row":2,"start_column":28,"end_row":2,"end_column":32,"start_byte":37,"end_byte":41},"name_range":{"start_row":2,"start_column":28,"end_row":2,"end_column":32,"start_byte":37,"end_byte":41},"context":"type"}
@@ -401,7 +401,7 @@ extends EditorPlugin
 func _ready() -> void:
 	pass
 "#####;
-        let expected = r#####"{"record":"file","schema":1,"path":"res://test.gd","extends":"EditorPlugin"}
+        let expected = r#####"{"record":"file","path":"res://test.gd","extends":"EditorPlugin"}
 {"record":"annotation","name":"tool","scope":"","range":{"start_row":1,"start_column":1,"end_row":1,"end_column":6,"start_byte":0,"end_byte":5}}
 {"record":"reference","name":"EditorPlugin","scope":"","range":{"start_row":2,"start_column":9,"end_row":2,"end_column":21,"start_byte":14,"end_byte":26},"name_range":{"start_row":2,"start_column":9,"end_row":2,"end_column":21,"start_byte":14,"end_byte":26},"context":"type"}
 {"record":"declaration","kind":"function","name":"_ready","scope":"","range":{"start_row":5,"start_column":1,"end_row":6,"end_column":6,"start_byte":29,"end_byte":57},"name_range":{"start_row":5,"start_column":6,"end_row":5,"end_column":12,"start_byte":34,"end_byte":40},"type":"void","body_range":{"start_row":5,"start_column":23,"end_row":6,"end_column":6,"start_byte":51,"end_byte":57},"body_is_pass_only":true}
@@ -421,7 +421,7 @@ func _ready() -> void:
 func _init(a: int = 1) -> void:
 	pass
 "#####;
-        let expected = r#####"{"record":"file","schema":1,"path":"res://test.gd","extends":"Node"}
+        let expected = r#####"{"record":"file","path":"res://test.gd","extends":"Node"}
 {"record":"reference","name":"Node","scope":"","range":{"start_row":1,"start_column":9,"end_row":1,"end_column":13,"start_byte":8,"end_byte":12},"name_range":{"start_row":1,"start_column":9,"end_row":1,"end_column":13,"start_byte":8,"end_byte":12},"context":"type"}
 {"record":"declaration","kind":"function","name":"_init","scope":"","range":{"start_row":4,"start_column":1,"end_row":5,"end_column":6,"start_byte":15,"end_byte":52},"name_range":{"start_row":4,"start_column":6,"end_row":4,"end_column":11,"start_byte":20,"end_byte":25},"type":"void","parameters":[{"name":"a","type":"int","default":"1","range":{"start_row":4,"start_column":12,"end_row":4,"end_column":22,"start_byte":26,"end_byte":36}}],"body_range":{"start_row":4,"start_column":32,"end_row":5,"end_column":6,"start_byte":46,"end_byte":52},"body_is_pass_only":true}
 {"record":"declaration","kind":"parameter","name":"a","scope":"_init","range":{"start_row":4,"start_column":12,"end_row":4,"end_column":22,"start_byte":26,"end_byte":36},"name_range":{"start_row":4,"start_column":12,"end_row":4,"end_column":13,"start_byte":26,"end_byte":27},"type":"int","default":"1"}
@@ -431,28 +431,6 @@ func _init(a: int = 1) -> void:
         assert_eq!(index_to_string(source), expected);
     }
 
-    /// Pins the schema version.
-    ///
-    /// Not here to check arithmetic. It is here so that changing a record shape
-    /// takes two deliberate steps rather than one: the exact-output tests above
-    /// fail first, and updating them alone is not enough, because this fails too
-    /// and asks the question those tests cannot. Would a consumer built against
-    /// the old shape misread the new one?
-    ///
-    /// While this producer and its consumer are developed and updated together,
-    /// the answer can be "yes, and that is fine, we will update both" without a
-    /// bump. Record the change in the history in
-    /// `docs/specification_index.md` either way, so a build that turns out to be
-    /// older than expected can be diagnosed rather than guessed at.
-    #[test]
-    fn test_the_schema_version_is_deliberate() {
-        assert_eq!(
-            crate::index::INDEX_SCHEMA_VERSION,
-            1,
-            "the schema version changed: check that the history in docs/specification_index.md changed with it"
-        );
-    }
-
     #[test]
     fn test_a_file_that_fails_to_parse_emits_only_its_header() {
         let mut output = String::new();
@@ -460,7 +438,7 @@ func _init(a: int = 1) -> void:
         assert!(!parsed_without_errors);
         assert_eq!(
             output,
-            "{\"record\":\"file\",\"schema\":1,\"path\":\"res://broken.gd\",\"parse_error\":true}\n"
+            "{\"record\":\"file\",\"path\":\"res://broken.gd\",\"parse_error\":true}\n"
         );
     }
 

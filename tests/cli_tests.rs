@@ -161,7 +161,7 @@ fn index_reports_project_relative_paths_and_fails_on_parse_errors() {
     assert!(stdin_output.status.success());
     let stdin_lines =
         String::from_utf8(stdin_output.stdout).expect("index output should be valid UTF-8");
-    assert!(stdin_lines.starts_with("{\"record\":\"file\",\"schema\":1,\"path\":\"<stdin>\"}\n"));
+    assert!(stdin_lines.starts_with("{\"record\":\"file\",\"path\":\"<stdin>\"}\n"));
 
     // An explicit root wins over discovery, which is the escape hatch for
     // layouts where walking up finds the wrong thing or nothing at all.
